@@ -3,7 +3,7 @@
 page_title: "logto_role Resource - logto"
 subcategory: ""
 description: |-
-  
+
 ---
 
 # logto_role (Resource)

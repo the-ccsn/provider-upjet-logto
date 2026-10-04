@@ -3,7 +3,7 @@
 page_title: "logto_api_resource_scope Resource - logto"
 subcategory: ""
 description: |-
-  
+
 ---
 
 # logto_api_resource_scope (Resource)

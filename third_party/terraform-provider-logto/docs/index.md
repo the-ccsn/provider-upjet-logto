@@ -3,7 +3,7 @@
 page_title: "logto Provider"
 subcategory: ""
 description: |-
-  
+
 ---
 
 # logto Provider

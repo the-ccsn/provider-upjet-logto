@@ -3,7 +3,7 @@
 page_title: "logto_user Resource - logto"
 subcategory: ""
 description: |-
-  
+
 ---
 
 # logto_user (Resource)
