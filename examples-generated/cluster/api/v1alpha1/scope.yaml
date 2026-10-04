@@ -1,0 +1,15 @@
+apiVersion: api.logto.crossplane.io/v1alpha1
+kind: Scope
+metadata:
+  annotations:
+    meta.upbound.io/example-id: api/v1alpha1/scope
+  labels:
+    testing.upbound.io/example-name: api_resource_scope
+  name: api-resource-scope
+spec:
+  forProvider:
+    description: scope_description
+    name: scope_name
+    resourceIdSelector:
+      matchLabels:
+        testing.upbound.io/example-name: api_resource

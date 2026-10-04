@@ -1,40 +1,187 @@
-name: hashicorp/null
+name: Lenstra/logto
 resources:
-    null_resource:
+    logto_api_resource:
         subCategory: ""
-        description: The null_resource resource implements the standard resource lifecycle but takes no further action. On Terraform 1.4 and later, use the terraform_data resource type https://developer.hashicorp.com/terraform/language/resources/terraform-data instead. Terraform 1.9 and later support the moved configuration block from null_resource to terraform_data. The triggers argument allows specifying an arbitrary set of values that, when changed, will cause the resource to be replaced.
-        name: null_resource
-        title: null_resource Resource - terraform-provider-null
+        name: logto_api_resource
+        title: logto_api_resource Resource - logto
         examples:
-            - name: cluster
+            - name: api_resource
               manifest: |-
                 {
-                  "connection": [
-                    {
-                      "host": "${element(aws_instance.cluster[*].public_ip, 0)}"
-                    }
-                  ],
-                  "provisioner": {
-                    "remote-exec": [
-                      {
-                        "inline": [
-                          "bootstrap-cluster.sh ${join(\" \",\n      aws_instance.cluster[*].private_ip)}"
-                        ]
-                      }
-                    ]
-                  },
-                  "triggers": {
-                    "cluster_instance_ids": "${join(\",\", aws_instance.cluster[*].id)}"
-                  }
+                  "access_token_ttl": 3600,
+                  "indicator": "https://api-resource.test",
+                  "name": "api_resource_name"
                 }
               dependencies:
-                aws_instance.cluster: |-
+                logto_api_resource_scope.api_resource_scope: |-
                     {
-                      "ami": "ami-0dcc1e21636832c5d",
-                      "count": 3,
-                      "instance_type": "m5.large"
+                      "depends_on": [
+                        "${logto_api_resource.api_resource}"
+                      ],
+                      "description": "scope_description",
+                      "name": "scope_name",
+                      "resource_id": "${logto_api_resource.api_resource.id}"
                     }
         argumentDocs:
-            id: (String) This is set to a random value at create time.
-            triggers: (Map of String) A map of arbitrary strings that, when changed, will force the null resource to be replaced, re-running any associated provisioners.
+            access_token_ttl: (Number) The access token TTL in seconds. It affects the exp claim of the access token granted for this resource.
+            created_at: (Number)
+            description: (String)
+            id: (String) The unique identifier of the resource.
+            indicator: (String) The unique resource indicator. Should be a valid URI.
+            is_default: (Boolean)
+            name: (String) The name of the resource.
+            resource_id: (String)
+            scopes: (Attributes List) (see below for nested schema)
+            tenant_id: (String)
+        importStatements: []
+    logto_api_resource_scope:
+        subCategory: ""
+        name: logto_api_resource_scope
+        title: logto_api_resource_scope Resource - logto
+        examples:
+            - name: api_resource_scope
+              manifest: |-
+                {
+                  "depends_on": [
+                    "${logto_api_resource.api_resource}"
+                  ],
+                  "description": "scope_description",
+                  "name": "scope_name",
+                  "resource_id": "${logto_api_resource.api_resource.id}"
+                }
+              references:
+                resource_id: logto_api_resource.api_resource.id
+        argumentDocs:
+            created_at: (Number)
+            description: (String)
+            id: (String) The ID of this resource.
+            name: (String) The name of the scope. It should be unique for the resource.
+            resource_id: (String) The unique identifier of the resource.
+            tenant_id: (String)
+        importStatements: []
+    logto_application:
+        subCategory: ""
+        name: logto_application
+        title: logto_application Resource - logto
+        examples:
+            - name: app
+              manifest: |-
+                {
+                  "description": "test app description",
+                  "name": "test",
+                  "type": "Native"
+                }
+        argumentDocs:
+            client_secrets: (Map of String, Sensitive) Existing named application secrets; read-only, without implicit rotation.
+            cors_allowed_origins: (List of String)
+            description: (String)
+            id: (String) The unique identifier of the application.
+            is_admin: (Boolean)
+            is_third_party: (Boolean)
+            name: (String)
+            post_logout_redirect_uris: (List of String)
+            redirect_uris: (List of String)
+            tenant_id: (String)
+            type: (String)
+        importStatements: []
+    logto_application_secret:
+        subCategory: ""
+        description: Manage a named application secret generated by Logto.
+        name: logto_application_secret
+        title: logto_application_secret Resource - terraform-provider-logto
+        examples:
+            - name: grafana
+              manifest: |-
+                {
+                  "application_id": "${logto_application.grafana.id}",
+                  "name": "gitops"
+                }
+              references:
+                application_id: logto_application.grafana.id
+        argumentDocs: {}
+        importStatements: []
+    logto_role:
+        subCategory: ""
+        name: logto_role
+        title: logto_role Resource - logto
+        examples:
+            - name: test_role
+              manifest: |-
+                {
+                  "depends_on": [
+                    "${logto_api_resource_scope.api_resource_scope}"
+                  ],
+                  "description": "role_description",
+                  "name": "role_name",
+                  "scope_ids": [
+                    "${logto_api_resource_scope.api_resource_scope.id}"
+                  ],
+                  "type": "User"
+                }
+              references:
+                scope_ids: logto_api_resource_scope.api_resource_scope.id
+              dependencies:
+                logto_api_resource.api_resource: |-
+                    {
+                      "access_token_ttl": 3600,
+                      "indicator": "https://api-resource.test",
+                      "name": "api_resource_name"
+                    }
+                logto_api_resource_scope.api_resource_scope: |-
+                    {
+                      "depends_on": [
+                        "${logto_api_resource.api_resource}"
+                      ],
+                      "description": "test_scope_description",
+                      "name": "scope_name",
+                      "resource_id": "${logto_api_resource.api_resource.id}"
+                    }
+        argumentDocs:
+            description: (String)
+            id: (String) The unique identifier of the role.
+            is_default: (Boolean)
+            name: (String) The name of the role. It should be unique within the tenant.
+            scope_ids: (List of String) API resource scopes assigned to the role. An empty list revokes all scopes; omission leaves them unmanaged. Changes preserve the role ID and memberships.
+            type: (String) The type of the role. It cannot be changed after creation.
+        importStatements: []
+    logto_user:
+        subCategory: ""
+        name: logto_user
+        title: logto_user Resource - logto
+        examples:
+            - name: user
+              manifest: |-
+                {
+                  "name": "user_name",
+                  "primary_email": "user_primary_email@example.fr",
+                  "profile": {
+                    "family_name": "family name",
+                    "given_name": "given name",
+                    "middle_name": "middle name",
+                    "nickname": "nickname"
+                  },
+                  "role_ids": [
+                    "${logto_role.role.id}"
+                  ]
+                }
+              references:
+                role_ids: logto_role.role.id
+              dependencies:
+                logto_role.role: |-
+                    {
+                      "description": "role_description",
+                      "name": "role_name",
+                      "type": "User"
+                    }
+        argumentDocs:
+            family_name: (String)
+            given_name: (String)
+            id: (String) The ID of this resource.
+            middle_name: (String)
+            name: (String)
+            nickname: (String)
+            primary_email: (String) Primary email address for the user. It should be unique across all users.
+            profile: (Attributes) (see below for nested schema)
+            role_ids: (Set of String) An array of API resource role IDs to assign.
+            username: (String) Username for the user. It should be unique across all users.
         importStatements: []

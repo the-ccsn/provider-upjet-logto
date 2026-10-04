@@ -10,15 +10,21 @@ package cluster
 import (
 	"k8s.io/apimachinery/pkg/runtime"
 
-	v1alpha1 "github.com/crossplane/upjet-provider-template/apis/cluster/null/v1alpha1"
-	v1alpha1cluster "github.com/crossplane/upjet-provider-template/apis/cluster/v1alpha1"
-	v1beta1 "github.com/crossplane/upjet-provider-template/apis/cluster/v1beta1"
+	v1alpha1 "github.com/the-ccsn/provider-upjet-logto/apis/cluster/api/v1alpha1"
+	v1alpha1application "github.com/the-ccsn/provider-upjet-logto/apis/cluster/application/v1alpha1"
+	v1alpha1role "github.com/the-ccsn/provider-upjet-logto/apis/cluster/role/v1alpha1"
+	v1alpha1user "github.com/the-ccsn/provider-upjet-logto/apis/cluster/user/v1alpha1"
+	v1alpha1cluster "github.com/the-ccsn/provider-upjet-logto/apis/cluster/v1alpha1"
+	v1beta1 "github.com/the-ccsn/provider-upjet-logto/apis/cluster/v1beta1"
 )
 
 func init() {
 	// Register the types with the Scheme so the components can map objects to GroupVersionKinds and back
 	AddToSchemes = append(AddToSchemes,
 		v1alpha1.SchemeBuilder.AddToScheme,
+		v1alpha1application.SchemeBuilder.AddToScheme,
+		v1alpha1role.SchemeBuilder.AddToScheme,
+		v1alpha1user.SchemeBuilder.AddToScheme,
 		v1alpha1cluster.SchemeBuilder.AddToScheme,
 		v1beta1.SchemeBuilder.AddToScheme,
 	)

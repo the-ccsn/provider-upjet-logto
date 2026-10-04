@@ -1,0 +1,49 @@
+apiVersion: role.logto.crossplane.io/v1alpha1
+kind: Role
+metadata:
+  annotations:
+    meta.upbound.io/example-id: role/v1alpha1/role
+  labels:
+    testing.upbound.io/example-name: test_role
+  name: test-role
+spec:
+  forProvider:
+    description: role_description
+    name: role_name
+    scopeIdsRefs:
+    - name: api_resource_scope
+    type: User
+
+---
+
+apiVersion: api.logto.crossplane.io/v1alpha1
+kind: Resource
+metadata:
+  annotations:
+    meta.upbound.io/example-id: role/v1alpha1/role
+  labels:
+    testing.upbound.io/example-name: api_resource
+  name: api-resource
+spec:
+  forProvider:
+    accessTokenTtl: 3600
+    indicator: https://api-resource.test
+    name: api_resource_name
+
+---
+
+apiVersion: api.logto.crossplane.io/v1alpha1
+kind: Scope
+metadata:
+  annotations:
+    meta.upbound.io/example-id: role/v1alpha1/role
+  labels:
+    testing.upbound.io/example-name: api_resource_scope
+  name: api-resource-scope
+spec:
+  forProvider:
+    description: test_scope_description
+    name: scope_name
+    resourceIdSelector:
+      matchLabels:
+        testing.upbound.io/example-name: api_resource

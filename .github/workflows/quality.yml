@@ -1,0 +1,129 @@
+name: Quality
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  schedule:
+    - cron: '23 4 * * 1'
+permissions:
+  contents: read
+concurrency:
+  group: quality-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  quality:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      TF_ACC: ''
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-go@f111f3307d8850f501ac008e886eec1fd1932a34 # v5.3.0
+        with:
+          go-version: '1.26.8'
+          cache: true
+      - name: Race tests, vet and build
+        run: make verify
+      - name: Static analysis
+        run: make lint STATICCHECK='go run honnef.co/go/tools/cmd/staticcheck@1285a6a5ec1e0ebb658f49e82b6c566a878cc3cb'
+      - name: Reachable vulnerability scan
+        run: make security GOVULNCHECK='go run golang.org/x/vuln/cmd/govulncheck@v1.8.0'
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
+        with:
+          terraform_version: '1.11.4'
+          terraform_wrapper: false
+      - name: Reproducible generation
+        run: |
+          make generate
+          git diff --exit-code
+          test -z "$(git ls-files --others --exclude-standard)"
+      - name: Runtime image smoke test
+        run: |
+          make image
+          docker run --rm provider-upjet-logto:dev --help
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: coverage
+          path: '**/coverage.out'
+          if-no-files-found: error
+
+  integration:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:17.11@sha256:d74eeac9a635390a49bc21bd49fccd973de707e2a53a76ac49b552b8712ec46f
+        env:
+          POSTGRES_USER: logto
+          POSTGRES_DB: logto_acceptance
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 15543:5432
+        options: >-
+          --health-cmd "pg_isready -U logto -d logto_acceptance"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: cachix/install-nix-action@b85815f71a6de0ddee80b8a80a98d43f4bcc66c7 # v31
+      - name: Start disposable pinned Logto
+        run: |
+          image=ghcr.io/logto-io/logto:1.40.1@sha256:dabb2b3d087bb40fed8f33508ca16432ddf5c03f3e0846e36fe1f399a00ab1f3
+          docker run --network host --env DB_URL=postgresql://logto@127.0.0.1:15543/logto_acceptance --entrypoint node "$image" packages/cli/bin/logto.js db seed --swe
+          docker run -d --name logto-acceptance --network host --env DB_URL=postgresql://logto@127.0.0.1:15543/logto_acceptance --env PORT=13001 --env ADMIN_PORT=13002 --env ENDPOINT=http://127.0.0.1:13001 "$image"
+          python3 - <<'PY'
+          import time, urllib.request
+          for attempt in range(60):
+              try:
+                  with urllib.request.urlopen('http://127.0.0.1:13001/oidc/.well-known/openid-configuration', timeout=2) as response:
+                      if response.status == 200:
+                          break
+              except OSError:
+                  time.sleep(1)
+          else:
+              raise SystemExit('Logto did not become ready')
+          PY
+          LOGTO_TEST_DB_URL=postgresql://logto@127.0.0.1:15543/logto_acceptance nix develop --command python3 third_party/terraform-provider-logto/scripts/bootstrap_acceptance.py
+      - name: Real Logto Terraform protocol acceptance
+        run: LOGTO_TEST_CREDENTIALS="$PWD/.work/logto-credentials.json" nix develop --command make -C third_party/terraform-provider-logto test-integration
+      - name: Isolated API server and shipped controller acceptance
+        run: |
+          mkdir -p .work
+          nix build .#integration-tools --out-link .work/integration-tools
+          LOGTO_TEST_CREDENTIALS="$PWD/.work/logto-credentials.json" KUBEBUILDER_ASSETS="$(realpath .work/integration-tools)/bin" nix develop --command make test-integration
+      - name: Build and verify embedded provider package and SBOM
+        run: nix develop --command make package
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: local-provider-package
+          path: |
+            .work/*.xpkg
+            .work/*.spdx.json
+            .work/SHA256SUMS
+          if-no-files-found: error
+
+  packages:
+    needs: [quality, integration]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      matrix:
+        architecture: [amd64, arm64]
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: cachix/install-nix-action@b85815f71a6de0ddee80b8a80a98d43f4bcc66c7 # v31
+      - name: Build and verify architecture-specific release candidate
+        env:
+          GOARCH: ${{ matrix.architecture }}
+          VERSION: ${{ github.sha }}
+        run: nix develop --command make package
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: provider-package-${{ matrix.architecture }}
+          path: |
+            .work/*.xpkg
+            .work/*.spdx.json
+            .work/SHA256SUMS
+          if-no-files-found: error

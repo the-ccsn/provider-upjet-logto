@@ -1,0 +1,14 @@
+apiVersion: application.logto.m.crossplane.io/v1alpha1
+kind: Application
+metadata:
+  annotations:
+    meta.upbound.io/example-id: application/v1alpha1/application
+  labels:
+    testing.upbound.io/example-name: app
+  name: app
+  namespace: crossplane-system
+spec:
+  forProvider:
+    description: test app description
+    name: test
+    type: Native

@@ -1,0 +1,56 @@
+apiVersion: pkg.crossplane.io/v1beta1
+kind: DeploymentRuntimeConfig
+metadata:
+  name: logto-production
+spec:
+  deploymentTemplate:
+    spec:
+      selector: {}
+      template:
+        spec:
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65532
+            runAsGroup: 65532
+            fsGroup: 65532
+          containers:
+            - name: package-runtime
+              args:
+                - --leader-election=true
+                - --poll=1m
+                - --max-reconcile-rate=10
+                - --enable-secret-cache=false
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: [ALL]
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 256Mi
+                limits:
+                  cpu: "1"
+                  memory: 1Gi
+              startupProbe:
+                httpGet:
+                  path: /healthz
+                  port: 8081
+                periodSeconds: 5
+                failureThreshold: 30
+              livenessProbe:
+                httpGet:
+                  path: /healthz
+                  port: 8081
+                periodSeconds: 10
+              readinessProbe:
+                httpGet:
+                  path: /readyz
+                  port: 8081
+                periodSeconds: 5
+              volumeMounts:
+                - name: tmp
+                  mountPath: /tmp
+          volumes:
+            - name: tmp
+              emptyDir: {}

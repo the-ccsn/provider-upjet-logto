@@ -1,0 +1,34 @@
+apiVersion: application.logto.m.crossplane.io/v1alpha1
+kind: Application
+metadata:
+  name: grafana-example
+  namespace: crossplane-system
+spec:
+  managementPolicies: [Observe, Create, Update, LateInitialize]
+  forProvider:
+    name: grafana-example
+    type: Traditional
+    redirectUris:
+      - https://grafana.example.com/login/generic_oauth
+    postLogoutRedirectUris:
+      - https://grafana.example.com/login
+  providerConfigRef:
+    name: default
+    kind: ProviderConfig
+---
+apiVersion: application.logto.m.crossplane.io/v1alpha1
+kind: Secret
+metadata:
+  name: grafana-example-client-secret
+  namespace: crossplane-system
+spec:
+  managementPolicies: [Observe, Create, LateInitialize]
+  forProvider:
+    applicationIdRef:
+      name: grafana-example
+    name: gitops
+  providerConfigRef:
+    name: default
+    kind: ProviderConfig
+  writeConnectionSecretToRef:
+    name: grafana-example-connection

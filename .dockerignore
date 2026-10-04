@@ -1,0 +1,8 @@
+**
+!.work/
+!.work/bin/
+!.work/bin/provider
+!cluster/
+!cluster/images/
+!cluster/images/provider-upjet-logto/
+!cluster/images/provider-upjet-logto/Dockerfile

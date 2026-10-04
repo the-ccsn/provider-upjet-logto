@@ -9,3 +9,7 @@ cover.out
 # ignore IDE folders
 .vscode/
 .idea/
+
+coverage.out
+
+__pycache__/

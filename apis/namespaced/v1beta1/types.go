@@ -15,7 +15,7 @@ type ProviderConfigSpec struct {
 // ProviderCredentials required to authenticate.
 type ProviderCredentials struct {
 	// Source of the provider credentials.
-	// +kubebuilder:validation:Enum=None;Secret;InjectedIdentity;Environment;Filesystem
+	// +kubebuilder:validation:Enum=Secret
 	Source xpv2.CredentialsSource `json:"source"`
 
 	xpv2.CommonCredentialSelectors `json:",inline"`
@@ -28,12 +28,12 @@ type ProviderConfigStatus struct {
 
 // +kubebuilder:object:root=true
 
-// A ProviderConfig configures a Template provider.
+// A ProviderConfig configures a Logto provider.
 // +kubebuilder:subresource:status
 // +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 // +kubebuilder:printcolumn:name="SECRET-NAME",type="string",JSONPath=".spec.credentials.secretRef.name",priority=1
 // +kubebuilder:resource:scope=Namespaced
-// +kubebuilder:resource:scope=Namespaced,categories={crossplane,provider,template}
+// +kubebuilder:resource:scope=Namespaced,categories={crossplane,provider,logto}
 type ProviderConfig struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -58,7 +58,7 @@ type ProviderConfigList struct {
 // +kubebuilder:printcolumn:name="CONFIG-NAME",type="string",JSONPath=".providerConfigRef.name"
 // +kubebuilder:printcolumn:name="RESOURCE-KIND",type="string",JSONPath=".resourceRef.kind"
 // +kubebuilder:printcolumn:name="RESOURCE-NAME",type="string",JSONPath=".resourceRef.name"
-// +kubebuilder:resource:scope=Namespaced,categories={crossplane,provider,template}
+// +kubebuilder:resource:scope=Namespaced,categories={crossplane,provider,logto}
 type ProviderConfigUsage struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -77,12 +77,12 @@ type ProviderConfigUsageList struct {
 
 // +kubebuilder:object:root=true
 
-// A ClusterProviderConfig configures a Template provider.
+// A ClusterProviderConfig configures a Logto provider.
 // +kubebuilder:subresource:status
 // +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 // +kubebuilder:printcolumn:name="SECRET-NAME",type="string",JSONPath=".spec.credentials.secretRef.name",priority=1
 // +kubebuilder:resource:scope=Cluster
-// +kubebuilder:resource:scope=Cluster,categories={crossplane,provider,template}
+// +kubebuilder:resource:scope=Cluster,categories={crossplane,provider,logto}
 type ClusterProviderConfig struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

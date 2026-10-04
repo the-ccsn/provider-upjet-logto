@@ -9,8 +9,13 @@ import (
 
 	"github.com/crossplane/upjet/v2/pkg/controller"
 
-	resource "github.com/crossplane/upjet-provider-template/internal/controller/cluster/null/resource"
-	providerconfig "github.com/crossplane/upjet-provider-template/internal/controller/cluster/providerconfig"
+	resource "github.com/the-ccsn/provider-upjet-logto/internal/controller/cluster/api/resource"
+	scope "github.com/the-ccsn/provider-upjet-logto/internal/controller/cluster/api/scope"
+	application "github.com/the-ccsn/provider-upjet-logto/internal/controller/cluster/application/application"
+	secret "github.com/the-ccsn/provider-upjet-logto/internal/controller/cluster/application/secret"
+	providerconfig "github.com/the-ccsn/provider-upjet-logto/internal/controller/cluster/providerconfig"
+	role "github.com/the-ccsn/provider-upjet-logto/internal/controller/cluster/role/role"
+	user "github.com/the-ccsn/provider-upjet-logto/internal/controller/cluster/user/user"
 )
 
 // Setup creates all controllers with the supplied logger and adds them to
@@ -18,7 +23,12 @@ import (
 func Setup(mgr ctrl.Manager, o controller.Options) error {
 	for _, setup := range []func(ctrl.Manager, controller.Options) error{
 		resource.Setup,
+		scope.Setup,
+		application.Setup,
+		secret.Setup,
 		providerconfig.Setup,
+		role.Setup,
+		user.Setup,
 	} {
 		if err := setup(mgr, o); err != nil {
 			return err
@@ -32,7 +42,12 @@ func Setup(mgr ctrl.Manager, o controller.Options) error {
 func SetupGated(mgr ctrl.Manager, o controller.Options) error {
 	for _, setup := range []func(ctrl.Manager, controller.Options) error{
 		resource.SetupGated,
+		scope.SetupGated,
+		application.SetupGated,
+		secret.SetupGated,
 		providerconfig.SetupGated,
+		role.SetupGated,
+		user.SetupGated,
 	} {
 		if err := setup(mgr, o); err != nil {
 			return err
@@ -45,7 +60,12 @@ func SetupGated(mgr ctrl.Manager, o controller.Options) error {
 func SetupWebhookWithManager(mgr ctrl.Manager) error {
 	for _, setup := range []func(ctrl.Manager) error{
 		resource.SetupWebhookWithManager,
+		scope.SetupWebhookWithManager,
+		application.SetupWebhookWithManager,
+		secret.SetupWebhookWithManager,
 		providerconfig.SetupWebhookWithManager,
+		role.SetupWebhookWithManager,
+		user.SetupWebhookWithManager,
 	} {
 		if err := setup(mgr); err != nil {
 			return err

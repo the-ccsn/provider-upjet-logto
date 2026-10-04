@@ -1,0 +1,10 @@
+title = "CCSN provider secret scanning"
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Verified SHA-256 source-file digests, not credentials"
+condition = "AND"
+paths = ['''^third_party/terraform-provider-logto/snapshot\.json$''']
+regexTarget = "secret"
+regexes = ['''^[a-f0-9]{64}$''']

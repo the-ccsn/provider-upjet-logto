@@ -1,0 +1,12 @@
+provider-upjet-logto
+
+Maintained by CCSN: https://github.com/the-ccsn/provider-upjet-logto
+Derived from https://github.com/crossplane/upjet-provider-template
+Base commit: fa46ff9a40b1858ad4f91cda09b4ad695fe71bc0
+License: Apache-2.0; upstream notices in source files are retained.
+
+Includes a reviewed source snapshot of terraform-provider-logto:
+https://github.com/the-ccsn/terraform-provider-logto
+Upstream: https://github.com/Lenstra/terraform-provider-logto
+License: MIT; see third_party/terraform-provider-logto/LICENSE.
+Snapshot file hashes and source revision are recorded in snapshot.json.

@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"os"
 	"path/filepath"
 	"time"
@@ -31,6 +32,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/metrics"
@@ -39,14 +41,14 @@ import (
 
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 
-	apisCluster "github.com/crossplane/upjet-provider-template/apis/cluster"
-	apisNamespaced "github.com/crossplane/upjet-provider-template/apis/namespaced"
-	"github.com/crossplane/upjet-provider-template/config"
-	"github.com/crossplane/upjet-provider-template/internal/clients"
-	controllerCluster "github.com/crossplane/upjet-provider-template/internal/controller/cluster"
-	controllerNamespaced "github.com/crossplane/upjet-provider-template/internal/controller/namespaced"
-	"github.com/crossplane/upjet-provider-template/internal/features"
-	"github.com/crossplane/upjet-provider-template/internal/version"
+	apisCluster "github.com/the-ccsn/provider-upjet-logto/apis/cluster"
+	apisNamespaced "github.com/the-ccsn/provider-upjet-logto/apis/namespaced"
+	"github.com/the-ccsn/provider-upjet-logto/config"
+	"github.com/the-ccsn/provider-upjet-logto/internal/clients"
+	controllerCluster "github.com/the-ccsn/provider-upjet-logto/internal/controller/cluster"
+	controllerNamespaced "github.com/the-ccsn/provider-upjet-logto/internal/controller/namespaced"
+	"github.com/the-ccsn/provider-upjet-logto/internal/features"
+	"github.com/the-ccsn/provider-upjet-logto/internal/version"
 )
 
 const (
@@ -58,7 +60,7 @@ const (
 
 func main() {
 	var (
-		app                     = kingpin.New(filepath.Base(os.Args[0]), "Terraform based Crossplane provider for Template").DefaultEnvars()
+		app                     = kingpin.New(filepath.Base(os.Args[0]), "Terraform based Crossplane provider for Logto").DefaultEnvars()
 		debug                   = app.Flag("debug", "Run with debug logging.").Short('d').Bool()
 		syncPeriod              = app.Flag("sync", "Controller manager sync period such as 300ms, 1.5h, or 2h45m").Short('s').Default("1h").Duration()
 		pollInterval            = app.Flag("poll", "Poll interval controls how often an individual resource should be checked for drift.").Default("10m").Duration()
@@ -68,15 +70,16 @@ func main() {
 
 		webhookPort          = app.Flag("webhook-port", "The port the webhook listens on").Default("9443").Envar("WEBHOOK_PORT").Int()
 		metricsBindAddress   = app.Flag("metrics-bind-address", "The address the metrics server listens on").Default(":8080").Envar("METRICS_BIND_ADDRESS").String()
+		healthBindAddress    = app.Flag("health-bind-address", "The address for /healthz and /readyz probes.").Default(":8081").Envar("HEALTH_BIND_ADDRESS").String()
 		changelogsSocketPath = app.Flag("changelogs-socket-path", "Path for changelogs socket (if enabled)").Default("/var/run/changelogs/changelogs.sock").Envar("CHANGELOGS_SOCKET_PATH").String()
 
-		terraformVersion = app.Flag("terraform-version", "Terraform version.").Required().Envar("TERRAFORM_VERSION").String()
-		providerSource   = app.Flag("terraform-provider-source", "Terraform provider source.").Required().Envar("TERRAFORM_PROVIDER_SOURCE").String()
-		providerVersion  = app.Flag("terraform-provider-version", "Terraform provider version.").Required().Envar("TERRAFORM_PROVIDER_VERSION").String()
+		terraformVersion = app.Flag("terraform-version", "Terraform compatibility version (metadata only).").Default("1.5.7").Envar("TERRAFORM_VERSION").String()
+		providerSource   = app.Flag("terraform-provider-source", "Terraform provider source.").Default("Lenstra/logto").Envar("TERRAFORM_PROVIDER_SOURCE").String()
+		providerVersion  = app.Flag("terraform-provider-version", "Terraform provider version.").Default("0.0.15").Envar("TERRAFORM_PROVIDER_VERSION").String()
 
 		enableManagementPolicies = app.Flag("enable-management-policies", "Enable support for Management Policies.").Default("true").Envar("ENABLE_MANAGEMENT_POLICIES").Bool()
 		enableChangeLogs         = app.Flag("enable-changelogs", "Enable support for capturing change logs during reconciliation.").Default("false").Envar("ENABLE_CHANGE_LOGS").Bool()
-		enableSecretCache        = app.Flag("enable-secret-cache", "Enable caching of Secret objects. When true, Secrets are served from the informer cache instead of direct API calls. This reduces API server load but increases memory usage.").Default("true").Envar("ENABLE_SECRET_CACHE").Bool()
+		enableSecretCache        = app.Flag("enable-secret-cache", "Enable caching of Secret objects instead of direct API calls.").Default("false").Envar("ENABLE_SECRET_CACHE").Bool()
 
 		certsDirSet = false
 		// we record whether the command-line option "--certs-dir" was supplied
@@ -88,9 +91,10 @@ func main() {
 	)
 
 	kingpin.MustParse(app.Parse(os.Args[1:]))
+	kingpin.FatalIfError(validateRuntimeOptions(*syncPeriod, *pollInterval, *pollStateMetricInterval, *maxReconcileRate, *webhookPort), "Invalid runtime configuration")
 
 	zl := zap.New(zap.UseDevMode(*debug))
-	log := logging.NewLogrLogger(zl.WithName("upjet-provider-template"))
+	log := logging.NewLogrLogger(zl.WithName("provider-upjet-logto"))
 	if *debug {
 		// The controller-runtime runs with a no-op logger by default. It is
 		// *very* verbose even at info level, so we only provide it a real
@@ -139,14 +143,15 @@ func main() {
 
 	scheme := runtime.NewScheme()
 	kingpin.FatalIfError(clientgoscheme.AddToScheme(scheme), "Cannot add clientgo scheme")
-	kingpin.FatalIfError(apisCluster.AddToScheme(scheme), "Cannot add cluster-scoped Template APIs to scheme")
-	kingpin.FatalIfError(apisNamespaced.AddToScheme(scheme), "Cannot add namespace-scoped Template APIs to scheme")
+	kingpin.FatalIfError(apisCluster.AddToScheme(scheme), "Cannot add cluster-scoped Logto APIs to scheme")
+	kingpin.FatalIfError(apisNamespaced.AddToScheme(scheme), "Cannot add namespace-scoped Logto APIs to scheme")
 	kingpin.FatalIfError(apiextensionsv1.AddToScheme(scheme), "Cannot add CustomResourceDefinition to scheme")
 
 	mgr, err := ctrl.NewManager(cfg, ctrl.Options{
-		Scheme:           scheme,
-		LeaderElection:   *leaderElection,
-		LeaderElectionID: "crossplane-leader-election-upjet-provider-template",
+		Scheme:                 scheme,
+		LeaderElection:         *leaderElection,
+		LeaderElectionID:       "crossplane-leader-election-provider-upjet-logto",
+		HealthProbeBindAddress: *healthBindAddress,
 		Cache: cache.Options{
 			SyncPeriod: syncPeriod,
 			ByObject: map[client.Object]cache.ByObject{
@@ -169,8 +174,17 @@ func main() {
 		RenewDeadline:              func() *time.Duration { d := 50 * time.Second; return &d }(),
 	})
 	kingpin.FatalIfError(err, "Cannot create controller manager")
-	kingpin.FatalIfError(apisCluster.AddToScheme(mgr.GetScheme()), "Cannot add cluster-scoped Template APIs to scheme")
-	kingpin.FatalIfError(apisNamespaced.AddToScheme(mgr.GetScheme()), "Cannot add namespaced Template APIs to scheme")
+	kingpin.FatalIfError(mgr.AddHealthzCheck("ping", healthz.Ping), "Cannot register health probe")
+	kingpin.FatalIfError(mgr.AddReadyzCheck("cache", func(_ *http.Request) error {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		if !mgr.GetCache().WaitForCacheSync(ctx) {
+			return fmt.Errorf("controller cache is not synchronized")
+		}
+		return nil
+	}), "Cannot register readiness probe")
+	kingpin.FatalIfError(apisCluster.AddToScheme(mgr.GetScheme()), "Cannot add cluster-scoped Logto APIs to scheme")
+	kingpin.FatalIfError(apisNamespaced.AddToScheme(mgr.GetScheme()), "Cannot add namespaced Logto APIs to scheme")
 	kingpin.FatalIfError(apiextensionsv1.AddToScheme(mgr.GetScheme()), "Cannot add api-extensions APIs to scheme")
 	kingpin.FatalIfError(authv1.AddToScheme(mgr.GetScheme()), "Cannot add k8s authorization APIs to scheme")
 
@@ -179,11 +193,12 @@ func main() {
 
 	metrics.Registry.MustRegister(metricRecorder)
 	metrics.Registry.MustRegister(stateMetrics)
+	globalRateLimiter := ratelimiter.NewGlobal(*maxReconcileRate)
 
 	clusterOpts := tjcontroller.Options{
 		Options: xpcontroller.Options{
 			Logger:                  log,
-			GlobalRateLimiter:       ratelimiter.NewGlobal(*maxReconcileRate),
+			GlobalRateLimiter:       globalRateLimiter,
 			PollInterval:            *pollInterval,
 			MaxConcurrentReconciles: *maxReconcileRate,
 			Features:                &feature.Flags{},
@@ -196,15 +211,16 @@ func main() {
 		Provider: config.GetProvider(),
 		// use the following WorkspaceStoreOption to enable the shared gRPC mode
 		// terraform.WithProviderRunner(terraform.NewSharedProvider(log, os.Getenv("TERRAFORM_NATIVE_PROVIDER_PATH"), terraform.WithNativeProviderArgs("-debuggable")))
-		WorkspaceStore: terraform.NewWorkspaceStore(log),
-		SetupFn:        clients.TerraformSetupBuilder(*terraformVersion, *providerSource, *providerVersion),
-		StartWebhooks:  *certsDir != "",
+		WorkspaceStore:        terraform.NewWorkspaceStore(log),
+		OperationTrackerStore: tjcontroller.NewOperationStore(log),
+		SetupFn:               clients.TerraformSetupBuilder(*terraformVersion, *providerSource, *providerVersion),
+		StartWebhooks:         *certsDir != "",
 	}
 
 	namespacedOpts := tjcontroller.Options{
 		Options: xpcontroller.Options{
 			Logger:                  log,
-			GlobalRateLimiter:       ratelimiter.NewGlobal(*maxReconcileRate),
+			GlobalRateLimiter:       globalRateLimiter,
 			PollInterval:            *pollInterval,
 			MaxConcurrentReconciles: *maxReconcileRate,
 			Features:                &feature.Flags{},
@@ -217,9 +233,10 @@ func main() {
 		Provider: config.GetProviderNamespaced(),
 		// use the following WorkspaceStoreOption to enable the shared gRPC mode
 		// terraform.WithProviderRunner(terraform.NewSharedProvider(log, os.Getenv("TERRAFORM_NATIVE_PROVIDER_PATH"), terraform.WithNativeProviderArgs("-debuggable")))
-		WorkspaceStore: terraform.NewWorkspaceStore(log),
-		SetupFn:        clients.TerraformSetupBuilder(*terraformVersion, *providerSource, *providerVersion),
-		StartWebhooks:  *certsDir != "",
+		WorkspaceStore:        terraform.NewWorkspaceStore(log),
+		OperationTrackerStore: tjcontroller.NewOperationStore(log),
+		SetupFn:               clients.TerraformSetupBuilder(*terraformVersion, *providerSource, *providerVersion),
+		StartWebhooks:         *certsDir != "",
 	}
 
 	if *enableManagementPolicies {
@@ -239,7 +256,7 @@ func main() {
 		clo := xpcontroller.ChangeLogOptions{
 			ChangeLogger: managed.NewGRPCChangeLogger(
 				changelogsv1alpha1.NewChangeLogServiceClient(conn),
-				managed.WithProviderVersion(fmt.Sprintf("provider-upjet-aws:%s", version.Version))),
+				managed.WithProviderVersion(fmt.Sprintf("provider-upjet-logto:%s", version.Version))),
 		}
 		clusterOpts.ChangeLogOptions = &clo
 		namespacedOpts.ChangeLogOptions = &clo
@@ -256,12 +273,12 @@ func main() {
 			Gate:                    crdGate,
 			MaxConcurrentReconciles: 1,
 		}), "Cannot setup CRD gate")
-		kingpin.FatalIfError(controllerCluster.SetupGated(mgr, clusterOpts), "Cannot setup cluster-scoped Template controllers")
-		kingpin.FatalIfError(controllerNamespaced.SetupGated(mgr, namespacedOpts), "Cannot setup namespaced Template controllers")
+		kingpin.FatalIfError(controllerCluster.SetupGated(mgr, clusterOpts), "Cannot setup cluster-scoped Logto controllers")
+		kingpin.FatalIfError(controllerNamespaced.SetupGated(mgr, namespacedOpts), "Cannot setup namespaced Logto controllers")
 	} else {
 		log.Info("Provider has missing RBAC permissions for watching CRDs, controller SafeStart capability will be disabled")
-		kingpin.FatalIfError(controllerCluster.Setup(mgr, clusterOpts), "Cannot setup cluster-scoped Template controllers")
-		kingpin.FatalIfError(controllerNamespaced.Setup(mgr, namespacedOpts), "Cannot setup namespaced Template controllers")
+		kingpin.FatalIfError(controllerCluster.Setup(mgr, clusterOpts), "Cannot setup cluster-scoped Logto controllers")
+		kingpin.FatalIfError(controllerNamespaced.Setup(mgr, namespacedOpts), "Cannot setup namespaced Logto controllers")
 	}
 
 	kingpin.FatalIfError(mgr.Start(ctrl.SetupSignalHandler()), "Cannot start controller manager")
@@ -283,7 +300,7 @@ func canWatchCRD(ctx context.Context, mgr manager.Manager) (bool, error) {
 			},
 		}
 		if err := mgr.GetClient().Create(ctx, sar); err != nil {
-			return false, errors.Wrapf(err, "unable to perform RBAC check for verb %s on CustomResourceDefinitions", verbs)
+			return false, errors.Wrapf(err, "unable to perform RBAC check for verb %s on CustomResourceDefinitions", verb)
 		}
 		if !sar.Status.Allowed {
 			return false, nil

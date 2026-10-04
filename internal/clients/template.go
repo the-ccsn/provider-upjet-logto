@@ -3,6 +3,8 @@ package clients
 import (
 	"context"
 	"encoding/json"
+	tfprovider "github.com/Lenstra/terraform-provider-logto/provider"
+	xpv2 "github.com/crossplane/crossplane/apis/v2/core/v2"
 
 	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
 	"github.com/pkg/errors"
@@ -11,8 +13,8 @@ import (
 
 	"github.com/crossplane/upjet/v2/pkg/terraform"
 
-	clusterv1beta1 "github.com/crossplane/upjet-provider-template/apis/cluster/v1beta1"
-	namespacedv1beta1 "github.com/crossplane/upjet-provider-template/apis/namespaced/v1beta1"
+	clusterv1beta1 "github.com/the-ccsn/provider-upjet-logto/apis/cluster/v1beta1"
+	namespacedv1beta1 "github.com/the-ccsn/provider-upjet-logto/apis/namespaced/v1beta1"
 )
 
 const (
@@ -41,6 +43,9 @@ func TerraformSetupBuilder(version, providerSource, providerVersion string) terr
 			return terraform.Setup{}, errors.Wrap(err, "cannot resolve provider config")
 		}
 
+		if pcSpec.Credentials.Source != xpv2.CredentialsSourceSecret {
+			return ps, errors.New("Logto provider credentials must use a Kubernetes Secret")
+		}
 		data, err := resource.CommonCredentialExtractor(ctx, pcSpec.Credentials.Source, client, pcSpec.Credentials.CommonCredentialSelectors)
 		if err != nil {
 			return ps, errors.Wrap(err, errExtractCredentials)
@@ -50,11 +55,17 @@ func TerraformSetupBuilder(version, providerSource, providerVersion string) terr
 			return ps, errors.Wrap(err, errUnmarshalCredentials)
 		}
 
-		// Set credentials in Terraform provider configuration.
-		/*ps.Configuration = map[string]any{
-			"username": creds["username"],
-			"password": creds["password"],
-		}*/
+		for _, key := range []string{"hostname", "application_id", "application_secret", "resource"} {
+			if creds[key] == "" {
+				return ps, errors.Errorf("missing Logto credential field %s", key)
+			}
+		}
+		ps.Configuration = map[string]any{
+			"hostname": creds["hostname"], "application_id": creds["application_id"],
+			"application_secret": creds["application_secret"], "resource": creds["resource"],
+		}
+		// Never share configured provider instances between tenants or reconciles.
+		ps.FrameworkProvider = tfprovider.New("dev")()
 		return ps, nil
 	}
 }
@@ -129,7 +140,9 @@ func resolveModern(ctx context.Context, crClient client.Client, mg resource.Mode
 	case *namespacedv1beta1.ProviderConfig:
 		pcSpec = pc.Spec
 		if pcSpec.Credentials.SecretRef != nil {
-			pcSpec.Credentials.SecretRef.Namespace = mg.GetNamespace()
+			selector := *pcSpec.Credentials.SecretRef
+			selector.Namespace = mg.GetNamespace()
+			pcSpec.Credentials.SecretRef = &selector
 		}
 	case *namespacedv1beta1.ClusterProviderConfig:
 		pcSpec = pc.Spec

@@ -1,0 +1,30 @@
+# Replace these placeholders with IDs verified in your Logto console.
+apiVersion: application.logto.m.crossplane.io/v1alpha1
+kind: Application
+metadata:
+  name: existing-application
+  namespace: crossplane-system
+  annotations:
+    crossplane.io/external-name: REPLACE_WITH_EXISTING_APPLICATION_ID
+spec:
+  managementPolicies: [Observe]
+  forProvider: {}
+  providerConfigRef:
+    name: default
+    kind: ProviderConfig
+---
+apiVersion: application.logto.m.crossplane.io/v1alpha1
+kind: Secret
+metadata:
+  name: existing-client-secret
+  namespace: crossplane-system
+  annotations:
+    crossplane.io/external-name: REPLACE_WITH_EXISTING_APPLICATION_ID/REPLACE_WITH_NAMED_SECRET
+spec:
+  managementPolicies: [Observe]
+  forProvider: {}
+  providerConfigRef:
+    name: default
+    kind: ProviderConfig
+  writeConnectionSecretToRef:
+    name: existing-application-connection
