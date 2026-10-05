@@ -81,7 +81,7 @@ func generateAdditionalFiles(output string) error {
 	for _, entry := range entries {
 		if entry.IsDir() && strings.HasPrefix(entry.Name(), "resource_") {
 			// This resource owns its schema and implementation; it is not generated.
-			if entry.Name() == "resource_application_secret" {
+			if entry.Name() == "resource_application_secret" || entry.Name() == "resource_configuration" {
 				continue
 			}
 			packageName := strings.TrimPrefix(entry.Name(), "resource_")

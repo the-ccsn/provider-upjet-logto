@@ -151,14 +151,40 @@ func protocolCreate(t *testing.T, ctx context.Context, p fwprovider.Provider, c 
 		if err := current.As(&updated); err != nil {
 			t.Fatal(err)
 		}
-		updated["name"] = tftypes.NewValue(tftypes.String, "protocol-updated")
+		if _, ok := obj.AttributeTypes["name"]; ok {
+			updated["name"] = tftypes.NewValue(tftypes.String, "protocol-updated")
+			config["name"] = updated["name"]
+		} else if _, ok := obj.AttributeTypes["configuration"]; ok {
+			var encoded string
+			if err := updated["configuration"].As(&encoded); err != nil {
+				t.Fatal(err)
+			}
+			var desired map[string]any
+			if err := json.Unmarshal([]byte(encoded), &desired); err != nil {
+				t.Fatal(err)
+			}
+			switch name {
+			case "logto_sign_in_experience":
+				desired["supportWebsiteUrl"] = "https://updated.example.invalid"
+			case "logto_account_center":
+				desired["enabled"] = true
+			case "logto_id_token_config":
+				desired["enabledExtendedClaims"] = []string{"roles"}
+			case "logto_oidc_session_config":
+				desired["ttl"] = 1801
+			case "logto_connector":
+				desired["syncProfile"] = true
+			}
+			payload, _ := json.Marshal(desired)
+			updated["configuration"] = tftypes.NewValue(tftypes.String, string(payload))
+			config["configuration"] = updated["configuration"]
+		}
 		for _, field := range []string{"is_default", "is_third_party", "description", "username", "primary_email", "profile", "redirect_uris", "post_logout_redirect_uris", "cors_allowed_origins"} {
 			if typ, ok := obj.AttributeTypes[field]; ok && !plan.Schema.(resourceschema.Schema).Attributes[field].IsRequired() {
 				updated[field] = tftypes.NewValue(typ, tftypes.UnknownValue)
 				config[field] = tftypes.NewValue(typ, nil)
 			}
 		}
-		config["name"] = updated["name"]
 		newConfig, err := tfprotov6.NewDynamicValue(obj, tftypes.NewValue(obj, config))
 		if err != nil {
 			t.Fatal(err)
@@ -209,6 +235,9 @@ func TestResourceLifecycle(t *testing.T) {
 		r := factory()
 		var meta resource.MetadataResponse
 		r.Metadata(ctx, resource.MetadataRequest{ProviderTypeName: "logto"}, &meta)
+		if _, ok := client.ConfigurationContract(strings.TrimPrefix(meta.TypeName, "logto_")); ok {
+			continue
+		}
 		t.Run(meta.TypeName, func(t *testing.T) {
 			removed, secondaryFailure := false, false
 			entity := map[string]any{"id": "id", "tenantId": "tenant", "name": "example", "description": "description", "type": "Traditional", "isDefault": true, "isAdmin": false, "isThirdParty": true, "indicator": "https://api.example", "accessTokenTtl": 3600, "scopes": []any{}, "resourceId": "parent", "oidcClientMetadata": map[string]any{"redirectUris": []any{}, "postLogoutRedirectUris": []any{}}, "customClientMetadata": map[string]any{"corsAllowedOrigins": []any{}}, "username": "example", "primaryEmail": "example@example.com", "profile": map[string]any{"familyName": "", "givenName": "Existing", "middleName": "", "nickname": ""}}

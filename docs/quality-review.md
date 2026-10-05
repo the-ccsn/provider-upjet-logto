@@ -1,5 +1,7 @@
 # Logto Terraform / Upjet 质量审查
 
+> 这是 2026-10-04 的历史验证快照，资源数量、覆盖率和 package 结果针对当时的六类资源／17 CRD。此后的本地迁移扩展见 `docs/migration-validation.md`；不能将下方历史结果当作新增资源的验证结论。
+
 日期：2026-10-04。范围：本地 `terraform-provider-logto` 与 `provider-upjet-logto` 的当前工作区，包括未提交改动。审查基线分别为 `9ca998a15d9b3c1399d0cf9ca0ce863f88140707` 和 `fa46ff9a40b1858ad4f91cda09b4ad695fe71bc0`。
 
 ## 结论

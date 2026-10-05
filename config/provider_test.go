@@ -11,7 +11,7 @@ import (
 
 func TestSecretConnectionDetails(t *testing.T) {
 	cfg := GetProviderNamespaced()
-	if len(cfg.Resources) != 6 {
+	if len(cfg.Resources) != 11 {
 		t.Fatalf("got %d resources", len(cfg.Resources))
 	}
 	tr := &application.Secret{}

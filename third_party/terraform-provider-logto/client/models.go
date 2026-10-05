@@ -29,17 +29,19 @@ type ProtectedAppMetadata struct {
 }
 
 type ApplicationModel struct {
-	TenantId             string                 `json:"tenantId,omitempty"`
-	ID                   string                 `json:"id,omitempty"`
-	Name                 string                 `json:"name"`
-	Description          string                 `json:"description,omitempty"`
-	Type                 string                 `json:"type"`
-	OidcClientMetadata   *OidcClientMetadata    `json:"oidcClientMetadata,omitempty"`
-	CustomClientMetadata *CustomClientMetadata  `json:"customClientMetadata,omitempty"`
-	CustomData           map[string]interface{} `json:"customData,omitempty"`
-	ProtectedAppMetadata *ProtectedAppMetadata  `json:"protectedAppMetadata,omitempty"`
-	IsAdmin              bool                   `json:"isAdmin"`
-	IsThirdParty         bool                   `json:"isThirdParty"`
+	OidcClientMetadataExtra   map[string]any         `json:"-"`
+	CustomClientMetadataExtra map[string]any         `json:"-"`
+	TenantId                  string                 `json:"tenantId,omitempty"`
+	ID                        string                 `json:"id,omitempty"`
+	Name                      string                 `json:"name"`
+	Description               string                 `json:"description,omitempty"`
+	Type                      string                 `json:"type"`
+	OidcClientMetadata        *OidcClientMetadata    `json:"oidcClientMetadata,omitempty"`
+	CustomClientMetadata      *CustomClientMetadata  `json:"customClientMetadata,omitempty"`
+	CustomData                map[string]interface{} `json:"customData,omitempty"`
+	ProtectedAppMetadata      *ProtectedAppMetadata  `json:"protectedAppMetadata,omitempty"`
+	IsAdmin                   bool                   `json:"isAdmin"`
+	IsThirdParty              bool                   `json:"isThirdParty"`
 }
 
 type UserModel struct {

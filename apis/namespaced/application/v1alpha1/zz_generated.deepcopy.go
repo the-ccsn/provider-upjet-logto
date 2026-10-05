@@ -54,6 +54,11 @@ func (in *ApplicationInitParameters) DeepCopyInto(out *ApplicationInitParameters
 			}
 		}
 	}
+	if in.CustomClientMetadataExtra != nil {
+		in, out := &in.CustomClientMetadataExtra, &out.CustomClientMetadataExtra
+		*out = new(string)
+		**out = **in
+	}
 	if in.Description != nil {
 		in, out := &in.Description, &out.Description
 		*out = new(string)
@@ -66,6 +71,11 @@ func (in *ApplicationInitParameters) DeepCopyInto(out *ApplicationInitParameters
 	}
 	if in.Name != nil {
 		in, out := &in.Name, &out.Name
+		*out = new(string)
+		**out = **in
+	}
+	if in.OidcClientMetadataExtra != nil {
+		in, out := &in.OidcClientMetadataExtra, &out.OidcClientMetadataExtra
 		*out = new(string)
 		**out = **in
 	}
@@ -154,6 +164,11 @@ func (in *ApplicationObservation) DeepCopyInto(out *ApplicationObservation) {
 			}
 		}
 	}
+	if in.CustomClientMetadataExtra != nil {
+		in, out := &in.CustomClientMetadataExtra, &out.CustomClientMetadataExtra
+		*out = new(string)
+		**out = **in
+	}
 	if in.Description != nil {
 		in, out := &in.Description, &out.Description
 		*out = new(string)
@@ -176,6 +191,11 @@ func (in *ApplicationObservation) DeepCopyInto(out *ApplicationObservation) {
 	}
 	if in.Name != nil {
 		in, out := &in.Name, &out.Name
+		*out = new(string)
+		**out = **in
+	}
+	if in.OidcClientMetadataExtra != nil {
+		in, out := &in.OidcClientMetadataExtra, &out.OidcClientMetadataExtra
 		*out = new(string)
 		**out = **in
 	}
@@ -237,6 +257,11 @@ func (in *ApplicationParameters) DeepCopyInto(out *ApplicationParameters) {
 			}
 		}
 	}
+	if in.CustomClientMetadataExtra != nil {
+		in, out := &in.CustomClientMetadataExtra, &out.CustomClientMetadataExtra
+		*out = new(string)
+		**out = **in
+	}
 	if in.Description != nil {
 		in, out := &in.Description, &out.Description
 		*out = new(string)
@@ -249,6 +274,11 @@ func (in *ApplicationParameters) DeepCopyInto(out *ApplicationParameters) {
 	}
 	if in.Name != nil {
 		in, out := &in.Name, &out.Name
+		*out = new(string)
+		**out = **in
+	}
+	if in.OidcClientMetadataExtra != nil {
+		in, out := &in.OidcClientMetadataExtra, &out.OidcClientMetadataExtra
 		*out = new(string)
 		**out = **in
 	}

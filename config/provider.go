@@ -51,6 +51,10 @@ func providerConfig(root string) *ujconfig.Provider {
 		r.Sensitive.AdditionalConnectionDetailsFn = secretDetails
 		r.References["application_id"] = ujconfig.Reference{TerraformName: "logto_application"}
 	})
+	for name, kind := range map[string]string{"logto_sign_in_experience": "SignInExperience", "logto_account_center": "AccountCenter", "logto_id_token_config": "IDTokenConfiguration", "logto_oidc_session_config": "OIDCSessionConfiguration"} {
+		p.AddResourceConfigurator(name, func(r *ujconfig.Resource) { r.ShortGroup = "configuration"; r.Kind = kind })
+	}
+	p.AddResourceConfigurator("logto_connector", func(r *ujconfig.Resource) { r.ShortGroup = "connector"; r.Kind = "Connector" })
 	p.ConfigureResources()
 	return p
 }

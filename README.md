@@ -16,6 +16,11 @@ Each resource has a namespaced API and a legacy cluster-scoped API, version
 | `logto_application_secret` | `application.logto.m.crossplane.io` | `Secret` |
 | `logto_api_resource` | `api.logto.m.crossplane.io` | `Resource` |
 | `logto_api_resource_scope` | `api.logto.m.crossplane.io` | `Scope` |
+| `logto_connector` | `connector.logto.m.crossplane.io` | `Connector` |
+| `logto_sign_in_experience` | `configuration.logto.m.crossplane.io` | `SignInExperience` |
+| `logto_account_center` | `configuration.logto.m.crossplane.io` | `AccountCenter` |
+| `logto_id_token_config` | `configuration.logto.m.crossplane.io` | `IDTokenConfiguration` |
+| `logto_oidc_session_config` | `configuration.logto.m.crossplane.io` | `OIDCSessionConfiguration` |
 | `logto_role` | `role.logto.m.crossplane.io` | `Role` |
 | `logto_user` | `user.logto.m.crossplane.io` | `User` |
 
@@ -78,10 +83,10 @@ Terraform state; use an encrypted and access-controlled backend.
 
 ## Validation and remaining scope
 
-Offline tests cover all six resource lifecycles and Framework protocol v6
+Offline tests cover all eleven resource lifecycles and Framework protocol v6
 create/plan/update/read/delete, partial creation, pagination, bounded retries and cancellation,
 token reuse/refresh/concurrency, sensitive schemas, idempotent deletion,
-metadata preservation, credentials isolation, and status redaction. All 17
+metadata preservation, credentials isolation, and status redaction. All 27
 CRDs pass the Kubernetes API server structural/CEL validation functions.
 Real acceptance tests use the `integration` build tag and temporary loopback-only
 `LOGTO_TEST_CREDENTIALS`. `make test-integration` starts an isolated API Server
@@ -90,12 +95,20 @@ graph, drift repair, restart recovery, Observe adoption, connection Secrets,
 legacy cluster APIs and explicit empty role/scope revocation against Logto 1.40.1.
 `KUBEBUILDER_ASSETS` must point to local etcd, kube-apiserver and kubectl binaries.
 
-This is an initial implementation, not a completed migration of every SSO
-setting. Connector configuration, sign-in experience, custom token claims,
-organizations, and SAML-specific settings are not managed yet. The validated Logto version is 1.40.1. CI includes real Logto/controller acceptance
+Connector configuration uses a SecretRef, and its sensitive JSON stays out of
+status. Required sensitive selectors in initProvider are omitted when unset so
+they cannot mask a valid forProvider selector. Singleton resources manage explicit
+JSON contracts, adopt external ID `default`, and never reset tenant configuration
+on deletion. Organizations, JWT customizer scripts, and SAML-specific settings
+are not managed yet. The validated Logto version is 1.40.1. CI includes real Logto/controller acceptance
 and amd64/arm64 package builds. Actual Crossplane Core installation and upgrade,
 production RBAC, load/soak testing and signed distribution remain release gates.
 Automatic credential rotation is not implemented.
+
+Keep `LateInitialize` when creating resources whose IDs are assigned by Logto:
+the current Upjet async controller uses that policy to persist a generated
+external-name. Observe-only adoption supplies the existing external-name and
+does not need LateInitialize. Supply a connection Secret for sensitive state.
 
 Upstream references: [Terraform provider](https://github.com/Lenstra/terraform-provider-logto),
 [Upjet template](https://github.com/crossplane/upjet-provider-template),
@@ -119,7 +132,7 @@ GOARCH=arm64 nix develop --command make package
 
 Each build creates `.work/provider-upjet-logto.xpkg`, `runtime.spdx.json` and
 `SHA256SUMS`. Packaging embeds the compiled controller, checks the non-root
-runtime, CA certificates and all 17 CRDs, and inventories dependencies with
+runtime, CA certificates and all 27 CRDs, and inventories dependencies with
 Syft. The local package builder does not need a container daemon.
 
 ## License and provenance

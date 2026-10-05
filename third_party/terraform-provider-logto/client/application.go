@@ -2,6 +2,7 @@ package client
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -44,10 +45,24 @@ func (c *Client) ApplicationCreate(ctx context.Context, app *ApplicationModel) (
 		metadata.PostLogoutRedirectUris = nonNil(metadata.PostLogoutRedirectUris)
 		copyApp.OidcClientMetadata = &metadata
 	}
+	encoded, err := json.Marshal(copyApp)
+	if err != nil {
+		return nil, err
+	}
+	payload := map[string]any{}
+	if err := json.Unmarshal(encoded, &payload); err != nil {
+		return nil, err
+	}
+	if err := mergeApplicationMetadata(payload, "oidcClientMetadata", app.OidcClientMetadataExtra); err != nil {
+		return nil, err
+	}
+	if err := mergeApplicationMetadata(payload, "customClientMetadata", app.CustomClientMetadataExtra); err != nil {
+		return nil, err
+	}
 	req := &request{
 		method: http.MethodPost,
 		path:   "api/applications",
-		body:   &copyApp,
+		body:   payload,
 	}
 
 	res, err := expect(200)(c.do(ctx, req))
@@ -106,6 +121,18 @@ func (c *Client) ApplicationUpdate(ctx context.Context, app *ApplicationModel) (
 		}
 		metadata["corsAllowedOrigins"] = nonNil(app.CustomClientMetadata.CorsAllowedOrigins)
 		patch["customClientMetadata"] = metadata
+	}
+	if app.OidcClientMetadataExtra != nil && patch["oidcClientMetadata"] == nil {
+		patch["oidcClientMetadata"] = current["oidcClientMetadata"]
+	}
+	if app.CustomClientMetadataExtra != nil && patch["customClientMetadata"] == nil {
+		patch["customClientMetadata"] = current["customClientMetadata"]
+	}
+	if err := mergeApplicationMetadata(patch, "oidcClientMetadata", app.OidcClientMetadataExtra); err != nil {
+		return nil, err
+	}
+	if err := mergeApplicationMetadata(patch, "customClientMetadata", app.CustomClientMetadataExtra); err != nil {
+		return nil, err
 	}
 	// isAdmin is computed/read-only in our schema; never alter management grants.
 	req := &request{method: http.MethodPatch, path: "api/applications/" + url.PathEscape(app.ID), body: patch}

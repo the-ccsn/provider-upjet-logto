@@ -23,7 +23,7 @@ configuration surface, such as connectors and sign-in experience.
    create their own API server and never use an existing kubeconfig.
 5. Run `make package`. It builds an embedded runtime archive without a container
    daemon, builds the XPKG with the Crossplane CLI, generates an SPDX SBOM and
-   checks the binary digest, platform, non-root user, trust store and all 17 CRDs.
+   checks the binary digest, platform, non-root user, trust store and all 27 CRDs.
    `GOARCH=arm64 make package` builds the ARM candidate; rebuild for the host
    architecture before running native controller tests.
 6. Before publishing, define the fork's registry and version, configure signing

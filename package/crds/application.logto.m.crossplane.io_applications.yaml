@@ -63,6 +63,10 @@ spec:
                     items:
                       type: string
                     type: array
+                  customClientMetadataExtra:
+                    description: JSON for additional metadata; callback URI and CORS
+                      lists are managed separately.
+                    type: string
                   description:
                     description: (String)
                     type: string
@@ -71,6 +75,10 @@ spec:
                     type: boolean
                   name:
                     description: (String)
+                    type: string
+                  oidcClientMetadataExtra:
+                    description: JSON for additional metadata; callback URI and CORS
+                      lists are managed separately.
                     type: string
                   postLogoutRedirectUris:
                     description: (List of String)
@@ -104,6 +112,10 @@ spec:
                     items:
                       type: string
                     type: array
+                  customClientMetadataExtra:
+                    description: JSON for additional metadata; callback URI and CORS
+                      lists are managed separately.
+                    type: string
                   description:
                     description: (String)
                     type: string
@@ -112,6 +124,10 @@ spec:
                     type: boolean
                   name:
                     description: (String)
+                    type: string
+                  oidcClientMetadataExtra:
+                    description: JSON for additional metadata; callback URI and CORS
+                      lists are managed separately.
                     type: string
                   postLogoutRedirectUris:
                     description: (List of String)
@@ -204,6 +220,10 @@ spec:
                     items:
                       type: string
                     type: array
+                  customClientMetadataExtra:
+                    description: JSON for additional metadata; callback URI and CORS
+                      lists are managed separately.
+                    type: string
                   description:
                     description: (String)
                     type: string
@@ -218,6 +238,10 @@ spec:
                     type: boolean
                   name:
                     description: (String)
+                    type: string
+                  oidcClientMetadataExtra:
+                    description: JSON for additional metadata; callback URI and CORS
+                      lists are managed separately.
                     type: string
                   postLogoutRedirectUris:
                     description: (List of String)

@@ -33,6 +33,15 @@ func ApplicationResourceSchema(ctx context.Context) schema.Schema {
 					listplanmodifier.NullIsEmpty(),
 				},
 			},
+			"custom_client_metadata_extra": schema.StringAttribute{
+				Optional:            true,
+				Computed:            true,
+				Description:         "JSON for additional metadata; callback URI and CORS lists are managed separately.",
+				MarkdownDescription: "JSON for additional metadata; callback URI and CORS lists are managed separately.",
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
 			"description": schema.StringAttribute{
 				Optional: true,
 				Computed: true,
@@ -62,6 +71,15 @@ func ApplicationResourceSchema(ctx context.Context) schema.Schema {
 				Required: true,
 				Validators: []validator.String{
 					stringvalidator.LengthBetween(1, 256),
+				},
+			},
+			"oidc_client_metadata_extra": schema.StringAttribute{
+				Optional:            true,
+				Computed:            true,
+				Description:         "JSON for additional metadata; callback URI and CORS lists are managed separately.",
+				MarkdownDescription: "JSON for additional metadata; callback URI and CORS lists are managed separately.",
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"post_logout_redirect_uris": schema.ListAttribute{
@@ -102,15 +120,17 @@ func ApplicationResourceSchema(ctx context.Context) schema.Schema {
 }
 
 type ApplicationModel struct {
-	ClientSecrets          types.Map    `tfsdk:"client_secrets"`
-	CorsAllowedOrigins     types.List   `tfsdk:"cors_allowed_origins"`
-	Description            types.String `tfsdk:"description"`
-	Id                     types.String `tfsdk:"id"`
-	IsAdmin                types.Bool   `tfsdk:"is_admin"`
-	IsThirdParty           types.Bool   `tfsdk:"is_third_party"`
-	Name                   types.String `tfsdk:"name"`
-	PostLogoutRedirectUris types.List   `tfsdk:"post_logout_redirect_uris"`
-	RedirectUris           types.List   `tfsdk:"redirect_uris"`
-	TenantId               types.String `tfsdk:"tenant_id"`
-	Type                   types.String `tfsdk:"type"`
+	ClientSecrets             types.Map    `tfsdk:"client_secrets"`
+	CorsAllowedOrigins        types.List   `tfsdk:"cors_allowed_origins"`
+	CustomClientMetadataExtra types.String `tfsdk:"custom_client_metadata_extra"`
+	Description               types.String `tfsdk:"description"`
+	Id                        types.String `tfsdk:"id"`
+	IsAdmin                   types.Bool   `tfsdk:"is_admin"`
+	IsThirdParty              types.Bool   `tfsdk:"is_third_party"`
+	Name                      types.String `tfsdk:"name"`
+	OidcClientMetadataExtra   types.String `tfsdk:"oidc_client_metadata_extra"`
+	PostLogoutRedirectUris    types.List   `tfsdk:"post_logout_redirect_uris"`
+	RedirectUris              types.List   `tfsdk:"redirect_uris"`
+	TenantId                  types.String `tfsdk:"tenant_id"`
+	Type                      types.String `tfsdk:"type"`
 }

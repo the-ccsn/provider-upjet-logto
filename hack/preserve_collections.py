@@ -23,6 +23,12 @@ for path in sorted((root / 'apis').rglob('zz_*_types.go')):
             in_init = 'InitParameters struct {' in line
         if line.startswith('}'):
             in_parameters = False
+        # Upjet emits required sensitive selectors as value structs in
+        # initProvider too. An unset selector serializes as an empty reference,
+        # which its secret resolver reads before the valid forProvider selector.
+        if in_parameters and in_init and 'ConfigurationSecretRef v2.LocalSecretKeySelector' in line:
+            output.append('\t// +kubebuilder:validation:Optional\n')
+            line = line.replace('ConfigurationSecretRef v2.LocalSecretKeySelector', 'ConfigurationSecretRef *v2.LocalSecretKeySelector').replace('json:"configurationSecretRef"', 'json:"configurationSecretRef,omitempty"')
         tag = re.search(r'json:"([^" ,]+),omitempty" tf:"([^" ,]+),omitempty"', line)
         if in_parameters and tag and tag[2] in fields:
             line = line.replace(tag[0], f'json:"{tag[1]},omitzero" tf:"{tag[2]}"')

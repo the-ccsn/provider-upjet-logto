@@ -36,7 +36,7 @@ with tarfile.open(work / 'provider-upjet-logto.xpkg') as package:
     assert has_binary and has_ca, 'Missing executable or HTTPS trust store'
     expected_crds = list((root / 'package/crds').glob('*.yaml'))
     assert payload is not None, 'Missing Crossplane package payload'
-    assert payload.count('kind: CustomResourceDefinition\n') == len(expected_crds) == 17, 'Incomplete CRD bundle'
+    assert payload.count('kind: CustomResourceDefinition\n') == len(expected_crds) == 27, 'Incomplete CRD bundle'
     assert payload.count('kind: Provider\n') == 1, 'Missing provider metadata'
     for crd in expected_crds:
         name = re.search(r'^  name: (\S+)$', crd.read_text(), re.MULTILINE)[1]
@@ -48,4 +48,4 @@ checksums = []
 for name in ['provider-upjet-logto.xpkg', 'runtime.spdx.json']:
     checksums.append(f"{hashlib.sha256((work / name).read_bytes()).hexdigest()}  {name}")
 (work / 'SHA256SUMS').write_text('\n'.join(checksums) + '\n')
-print('Verified non-root runtime, executable hash, HTTPS trust store, all 17 CRDs and SPDX SBOM')
+print('Verified non-root runtime, executable hash, HTTPS trust store, all 27 CRDs and SPDX SBOM')

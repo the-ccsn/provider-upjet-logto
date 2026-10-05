@@ -43,6 +43,7 @@ def main():
             shutil.copyfile(path, target)
         base_commit = json.loads(MANIFEST.read_text())["base_commit"] if MANIFEST.exists() else subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=source, text=True).strip()
         manifest = {"upstream": "https://github.com/Lenstra/terraform-provider-logto", "base_commit": base_commit, "source_repository": "https://github.com/the-ccsn/terraform-provider-logto", "source_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=source, text=True).strip(), "files": {name: digest(path) for name, path in sorted(files.items())}}
+        manifest["source_dirty"] = bool(subprocess.check_output(["git", "status", "--porcelain", "--untracked-files=all"], cwd=source, text=True).strip())
         MANIFEST.write_text(json.dumps(manifest, indent=2) + "\n")
     manifest = json.loads(MANIFEST.read_text())
     actual = {p.relative_to(DEST).as_posix() for p in DEST.rglob("*") if p.is_file() and p.name != "snapshot.json" and ".work" not in p.parts and p.name != "coverage.out"}

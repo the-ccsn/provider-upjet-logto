@@ -89,6 +89,30 @@ func TestRealControllerGraph(t *testing.T) {
 		SetProviderConfigReference(*xpv2.ProviderConfigReference)
 		GetCondition(xpv2.ConditionType) xpv2.Condition
 	}{app, named, resource, scope, grant, account}
+	ids := map[string]string{}
+	t.Cleanup(func() {
+		stop()
+		// Capture IDs even if a dependency never became ready, before deleting owned objects.
+		for _, object := range managed {
+			if kube.Get(ctx, client.ObjectKeyFromObject(object), object) == nil {
+				ids[object.GetName()] = meta.GetExternalName(object)
+				if t.Failed() {
+					condition := object.GetCondition(xpv2.TypeSynced)
+					t.Logf("resource %s: externalName=%q Synced=%s reason=%s message=%s", object.GetName(), ids[object.GetName()], condition.Status, condition.Reason, condition.Message)
+				}
+			}
+		}
+		for _, owned := range []struct {
+			name   string
+			remove func(context.Context, string) error
+		}{{"user", remote.UserDelete}, {"role", remote.RoleDelete}, {"resource", remote.ApiResourceDelete}, {"application", remote.ApplicationDelete}} {
+			if id := ids[owned.name]; id != "" {
+				if err := owned.remove(ctx, id); err != nil {
+					t.Error(err)
+				}
+			}
+		}
+	})
 	// Create the dependency graph together; references must wait for their parents.
 	for _, object := range managed {
 		object.SetProviderConfigReference(&xpv2.ProviderConfigReference{Name: "default", Kind: "ProviderConfig"})
@@ -100,7 +124,6 @@ func TestRealControllerGraph(t *testing.T) {
 	if err := kube.Update(ctx, named); err != nil {
 		t.Fatal(err)
 	}
-	ids := map[string]string{}
 	for _, object := range managed {
 		eventually(t, "real graph ready: "+object.GetName(), func() bool {
 			if kube.Get(ctx, client.ObjectKeyFromObject(object), object) != nil {
@@ -110,21 +133,6 @@ func TestRealControllerGraph(t *testing.T) {
 		})
 		ids[object.GetName()] = meta.GetExternalName(object)
 	}
-	t.Cleanup(func() {
-		// Only objects created by this suite are removed from its disposable database.
-		if err := remote.UserDelete(ctx, ids["user"]); err != nil {
-			t.Error(err)
-		}
-		if err := remote.RoleDelete(ctx, ids["role"]); err != nil {
-			t.Error(err)
-		}
-		if err := remote.ApiResourceDelete(ctx, ids["resource"]); err != nil {
-			t.Error(err)
-		}
-		if err := remote.ApplicationDelete(ctx, ids["application"]); err != nil {
-			t.Error(err)
-		}
-	})
 	connection := &corev1.Secret{}
 	eventually(t, "real named secret connection", func() bool {
 		return kube.Get(ctx, types.NamespacedName{Name: "named-connection", Namespace: "tenant"}, connection) == nil && len(connection.Data["clientSecret"]) > 0
@@ -190,7 +198,7 @@ func TestRealControllerGraph(t *testing.T) {
 		return err == nil && current.Name == prefix
 	})
 	stop()
-	startProvider(t, configPath, caPath, dir)
+	stop = startProvider(t, configPath, caPath, dir)
 	for _, object := range managed {
 		eventually(t, "restart identity: "+object.GetName(), func() bool {
 			return kube.Get(ctx, client.ObjectKeyFromObject(object), object) == nil && meta.GetExternalName(object) == ids[object.GetName()] && object.GetCondition(xpv2.TypeSynced).Status == corev1.ConditionTrue
@@ -211,5 +219,86 @@ func TestRealControllerGraph(t *testing.T) {
 		scopes, err := remote.RoleScopesGet(ctx, ids["role"])
 		return err == nil && len(scopes) == 0
 	})
+	// Adopt an existing user using only its ID and role relation, as the GitOps
+	// migration does. Transfer write ownership before adding the second object.
+	if err := kube.Patch(ctx, account, client.RawPatch(types.MergePatchType, []byte(`{"spec":{"managementPolicies":["Observe"]}}`))); err != nil {
+		t.Fatal(err)
+	}
+	profileBefore, err := remote.UserGet(ctx, ids["user"])
+	if err != nil {
+		t.Fatal(err)
+	}
+	profileBefore.PrimaryEmail = prefix + "@example.invalid"
+	profileBefore.Profile = &logto.Profile{FamilyName: "Preserve", GivenName: "Existing", Nickname: "Account"}
+	if profileBefore, err = remote.UserUpdate(ctx, profileBefore); err != nil {
+		t.Fatal(err)
+	}
+	adoptedUser := &user.User{ObjectMeta: objectMeta("adopted-user"), Spec: user.UserSpec{ForProvider: user.UserParameters{RoleIdsRefs: []xpv2.NamespacedReference{{Name: "role"}}}}}
+	adoptedUser.SetProviderConfigReference(&xpv2.ProviderConfigReference{Name: "default", Kind: "ProviderConfig"})
+	adoptedUser.SetManagementPolicies(xpv2.ManagementPolicies{xpv2.ManagementActionObserve, xpv2.ManagementActionUpdate})
+	meta.SetExternalName(adoptedUser, ids["user"])
+	if err := kube.Create(ctx, adoptedUser); err != nil {
+		t.Fatal(err)
+	}
+	eventually(t, "ID-only user adoption updates roles", func() bool {
+		actual, err := remote.GetRolesForUser(ctx, ids["user"])
+		return err == nil && len(actual) == 1 && actual[0].ID == ids["role"]
+	})
+	profileAfter, err := remote.UserGet(ctx, ids["user"])
+	if err != nil {
+		t.Fatal(err)
+	}
+	beforeJSON, _ := json.Marshal(profileBefore)
+	afterJSON, _ := json.Marshal(profileAfter)
+	if string(beforeJSON) != string(afterJSON) {
+		t.Fatal("role-only adoption changed existing user profile")
+	}
+}
 
+func TestRealControllerConfigurations(t *testing.T) {
+	credentialPath := os.Getenv("LOGTO_TEST_CREDENTIALS")
+	if credentialPath == "" {
+		t.Skip("set LOGTO_TEST_CREDENTIALS to enable disposable real Logto acceptance")
+	}
+	data, err := os.ReadFile(credentialPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var credentials map[string]string
+	if json.Unmarshal(data, &credentials) != nil {
+		t.Fatal("invalid credentials JSON")
+	}
+	endpoint, err := url.Parse(credentials["endpoint"])
+	if err != nil || net.ParseIP(endpoint.Hostname()) == nil || !net.ParseIP(endpoint.Hostname()).IsLoopback() {
+		t.Fatal("real acceptance requires an explicit loopback IP")
+	}
+	remote, err := logto.NewClient(&logto.Config{Endpoint: endpoint.String(), Hostname: credentials["hostname"], ApplicationID: credentials["application_id"], ApplicationSecret: credentials["application_secret"], Resource: credentials["resource"]})
+	if err != nil {
+		t.Fatal(err)
+	}
+	proxy := httptest.NewTLSServer(httputil.NewSingleHostReverseProxy(endpoint))
+	t.Cleanup(proxy.Close)
+	kube, configPath, dir := newControlPlane(t)
+	caPath := filepath.Join(dir, "logto-ca.pem")
+	if err := os.WriteFile(caPath, pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: proxy.Certificate().Raw}), 0600); err != nil {
+		t.Fatal(err)
+	}
+	kubeCredentials := map[string]string{}
+	for key, value := range credentials {
+		kubeCredentials[key] = value
+	}
+	delete(kubeCredentials, "endpoint")
+	kubeCredentials["hostname"] = strings.TrimPrefix(proxy.URL, "https://")
+	encoded, _ := json.Marshal(kubeCredentials)
+	ctx := context.Background()
+	secret := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "management", Namespace: "tenant"}, Data: map[string][]byte{"credentials": encoded}}
+	if err := kube.Create(ctx, secret); err != nil {
+		t.Fatal(err)
+	}
+	pc := &pcapi.ProviderConfig{ObjectMeta: metav1.ObjectMeta{Name: "default", Namespace: "tenant"}, Spec: pcapi.ProviderConfigSpec{Credentials: pcapi.ProviderCredentials{Source: xpv2.CredentialsSourceSecret, CommonCredentialSelectors: xpv2.CommonCredentialSelectors{SecretRef: &xpv2.SecretKeySelector{SecretReference: xpv2.SecretReference{Name: "management", Namespace: "tenant"}, Key: "credentials"}}}}}
+	if err := kube.Create(ctx, pc); err != nil {
+		t.Fatal(err)
+	}
+	stop := startProvider(t, configPath, caPath, dir)
+	testRealConfigurations(t, kube, remote, stop)
 }

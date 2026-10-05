@@ -3,6 +3,7 @@ package provider_logto
 import (
 	"context"
 	"github.com/Lenstra/terraform-provider-logto/internal/provider/resource_application_secret"
+	"github.com/Lenstra/terraform-provider-logto/internal/provider/resource_configuration"
 	"os"
 
 	"github.com/Lenstra/terraform-provider-logto/internal/provider/resource_api_resource"
@@ -200,5 +201,10 @@ func (p *logtoProvider) Resources(_ context.Context) []func() resource.Resource 
 		resource_api_resource.ApiResourceResource,
 		resource_api_resource_scope.ApiResourceScopeResource,
 		resource_role.RoleResource,
+		resource_configuration.New("sign_in_experience"),
+		resource_configuration.New("account_center"),
+		resource_configuration.New("id_token_config"),
+		resource_configuration.New("oidc_session_config"),
+		resource_configuration.New("connector"),
 	}
 }

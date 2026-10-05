@@ -13,6 +13,11 @@ import (
 	scope "github.com/the-ccsn/provider-upjet-logto/internal/controller/namespaced/api/scope"
 	application "github.com/the-ccsn/provider-upjet-logto/internal/controller/namespaced/application/application"
 	secret "github.com/the-ccsn/provider-upjet-logto/internal/controller/namespaced/application/secret"
+	accountcenter "github.com/the-ccsn/provider-upjet-logto/internal/controller/namespaced/configuration/accountcenter"
+	idtokenconfiguration "github.com/the-ccsn/provider-upjet-logto/internal/controller/namespaced/configuration/idtokenconfiguration"
+	oidcsessionconfiguration "github.com/the-ccsn/provider-upjet-logto/internal/controller/namespaced/configuration/oidcsessionconfiguration"
+	signinexperience "github.com/the-ccsn/provider-upjet-logto/internal/controller/namespaced/configuration/signinexperience"
+	connector "github.com/the-ccsn/provider-upjet-logto/internal/controller/namespaced/connector/connector"
 	providerconfig "github.com/the-ccsn/provider-upjet-logto/internal/controller/namespaced/providerconfig"
 	role "github.com/the-ccsn/provider-upjet-logto/internal/controller/namespaced/role/role"
 	user "github.com/the-ccsn/provider-upjet-logto/internal/controller/namespaced/user/user"
@@ -26,6 +31,11 @@ func Setup(mgr ctrl.Manager, o controller.Options) error {
 		scope.Setup,
 		application.Setup,
 		secret.Setup,
+		accountcenter.Setup,
+		idtokenconfiguration.Setup,
+		oidcsessionconfiguration.Setup,
+		signinexperience.Setup,
+		connector.Setup,
 		providerconfig.Setup,
 		role.Setup,
 		user.Setup,
@@ -45,6 +55,11 @@ func SetupGated(mgr ctrl.Manager, o controller.Options) error {
 		scope.SetupGated,
 		application.SetupGated,
 		secret.SetupGated,
+		accountcenter.SetupGated,
+		idtokenconfiguration.SetupGated,
+		oidcsessionconfiguration.SetupGated,
+		signinexperience.SetupGated,
+		connector.SetupGated,
 		providerconfig.SetupGated,
 		role.SetupGated,
 		user.SetupGated,
@@ -63,6 +78,11 @@ func SetupWebhookWithManager(mgr ctrl.Manager) error {
 		scope.SetupWebhookWithManager,
 		application.SetupWebhookWithManager,
 		secret.SetupWebhookWithManager,
+		accountcenter.SetupWebhookWithManager,
+		idtokenconfiguration.SetupWebhookWithManager,
+		oidcsessionconfiguration.SetupWebhookWithManager,
+		signinexperience.SetupWebhookWithManager,
+		connector.SetupWebhookWithManager,
 		providerconfig.SetupWebhookWithManager,
 		role.SetupWebhookWithManager,
 		user.SetupWebhookWithManager,

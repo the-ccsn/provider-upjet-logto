@@ -72,6 +72,9 @@ func TestRealLogtoLifecycle(t *testing.T) {
 		r := factory()
 		var metadata resource.MetadataResponse
 		r.Metadata(ctx, resource.MetadataRequest{ProviderTypeName: "logto"}, &metadata)
+		if _, ok := client.ConfigurationContract(strings.TrimPrefix(metadata.TypeName, "logto_")); ok {
+			continue
+		}
 		t.Run(metadata.TypeName, func(t *testing.T) {
 			var schema resource.SchemaResponse
 			r.Schema(ctx, resource.SchemaRequest{}, &schema)

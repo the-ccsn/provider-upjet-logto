@@ -12,6 +12,8 @@ import (
 
 	v1alpha1 "github.com/the-ccsn/provider-upjet-logto/apis/namespaced/api/v1alpha1"
 	v1alpha1application "github.com/the-ccsn/provider-upjet-logto/apis/namespaced/application/v1alpha1"
+	v1alpha1configuration "github.com/the-ccsn/provider-upjet-logto/apis/namespaced/configuration/v1alpha1"
+	v1alpha1connector "github.com/the-ccsn/provider-upjet-logto/apis/namespaced/connector/v1alpha1"
 	v1alpha1role "github.com/the-ccsn/provider-upjet-logto/apis/namespaced/role/v1alpha1"
 	v1alpha1user "github.com/the-ccsn/provider-upjet-logto/apis/namespaced/user/v1alpha1"
 	v1alpha1namespaced "github.com/the-ccsn/provider-upjet-logto/apis/namespaced/v1alpha1"
@@ -23,6 +25,8 @@ func init() {
 	AddToSchemes = append(AddToSchemes,
 		v1alpha1.SchemeBuilder.AddToScheme,
 		v1alpha1application.SchemeBuilder.AddToScheme,
+		v1alpha1configuration.SchemeBuilder.AddToScheme,
+		v1alpha1connector.SchemeBuilder.AddToScheme,
 		v1alpha1role.SchemeBuilder.AddToScheme,
 		v1alpha1user.SchemeBuilder.AddToScheme,
 		v1alpha1namespaced.SchemeBuilder.AddToScheme,

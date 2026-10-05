@@ -208,7 +208,9 @@ func TestControllerLifecycle(t *testing.T) {
 func str(s string) *string { return &s }
 func eventually(t *testing.T, stage string, fn func() bool) {
 	t.Helper()
-	deadline := time.Now().Add(60 * time.Second)
+	// Dependency failures use Crossplane's exponential backoff capped at 60s.
+	// Allow more than one capped retry on slower CI workers.
+	deadline := time.Now().Add(3 * time.Minute)
 	for time.Now().Before(deadline) {
 		if fn() {
 			return

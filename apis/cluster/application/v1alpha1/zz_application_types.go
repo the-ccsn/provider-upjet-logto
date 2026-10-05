@@ -19,6 +19,9 @@ type ApplicationInitParameters struct {
 	// +kubebuilder:validation:Optional
 	CorsAllowedOrigins []*string `json:"corsAllowedOrigins,omitzero" tf:"cors_allowed_origins"`
 
+	// JSON for additional metadata; callback URI and CORS lists are managed separately.
+	CustomClientMetadataExtra *string `json:"customClientMetadataExtra,omitempty" tf:"custom_client_metadata_extra,omitempty"`
+
 	// (String)
 	Description *string `json:"description,omitempty" tf:"description,omitempty"`
 
@@ -27,6 +30,9 @@ type ApplicationInitParameters struct {
 
 	// (String)
 	Name *string `json:"name,omitempty" tf:"name,omitempty"`
+
+	// JSON for additional metadata; callback URI and CORS lists are managed separately.
+	OidcClientMetadataExtra *string `json:"oidcClientMetadataExtra,omitempty" tf:"oidc_client_metadata_extra,omitempty"`
 
 	// (List of String)
 	// +kubebuilder:validation:Optional
@@ -45,6 +51,9 @@ type ApplicationObservation struct {
 	// (List of String)
 	CorsAllowedOrigins []*string `json:"corsAllowedOrigins,omitempty" tf:"cors_allowed_origins,omitempty"`
 
+	// JSON for additional metadata; callback URI and CORS lists are managed separately.
+	CustomClientMetadataExtra *string `json:"customClientMetadataExtra,omitempty" tf:"custom_client_metadata_extra,omitempty"`
+
 	// (String)
 	Description *string `json:"description,omitempty" tf:"description,omitempty"`
 
@@ -59,6 +68,9 @@ type ApplicationObservation struct {
 
 	// (String)
 	Name *string `json:"name,omitempty" tf:"name,omitempty"`
+
+	// JSON for additional metadata; callback URI and CORS lists are managed separately.
+	OidcClientMetadataExtra *string `json:"oidcClientMetadataExtra,omitempty" tf:"oidc_client_metadata_extra,omitempty"`
 
 	// (List of String)
 	PostLogoutRedirectUris []*string `json:"postLogoutRedirectUris,omitempty" tf:"post_logout_redirect_uris,omitempty"`
@@ -79,6 +91,10 @@ type ApplicationParameters struct {
 	// +kubebuilder:validation:Optional
 	CorsAllowedOrigins []*string `json:"corsAllowedOrigins,omitzero" tf:"cors_allowed_origins"`
 
+	// JSON for additional metadata; callback URI and CORS lists are managed separately.
+	// +kubebuilder:validation:Optional
+	CustomClientMetadataExtra *string `json:"customClientMetadataExtra,omitempty" tf:"custom_client_metadata_extra,omitempty"`
+
 	// (String)
 	// +kubebuilder:validation:Optional
 	Description *string `json:"description,omitempty" tf:"description,omitempty"`
@@ -90,6 +106,10 @@ type ApplicationParameters struct {
 	// (String)
 	// +kubebuilder:validation:Optional
 	Name *string `json:"name,omitempty" tf:"name,omitempty"`
+
+	// JSON for additional metadata; callback URI and CORS lists are managed separately.
+	// +kubebuilder:validation:Optional
+	OidcClientMetadataExtra *string `json:"oidcClientMetadataExtra,omitempty" tf:"oidc_client_metadata_extra,omitempty"`
 
 	// (List of String)
 	// +kubebuilder:validation:Optional

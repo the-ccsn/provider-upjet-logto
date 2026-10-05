@@ -30,7 +30,7 @@ test-race:
 test-integration: build
 	@test -n "$(KUBEBUILDER_ASSETS)" || (echo 'Set KUBEBUILDER_ASSETS to local etcd, kube-apiserver and kubectl binaries'; exit 1)
 	@for bin in etcd kube-apiserver kubectl; do test -x "$(KUBEBUILDER_ASSETS)/$$bin" || exit 1; done
-	USE_EXISTING_CLUSTER=false TF_ACC= go test -race -tags=integration -timeout=5m -v ./test/integration
+	USE_EXISTING_CLUSTER=false TF_ACC= go test -race -tags=integration -timeout=10m -v ./test/integration
 vet:
 	cd $(TF_PROVIDER_DIR) && TF_ACC= go vet ./...
 	go vet ./...

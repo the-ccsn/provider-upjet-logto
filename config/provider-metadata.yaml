@@ -1,5 +1,12 @@
 name: Lenstra/logto
 resources:
+    logto_account_center Resource:
+        subCategory: ""
+        description: Tenant account center settings.
+        name: logto_account_center Resource
+        title: logto_account_center Resource
+        argumentDocs: {}
+        importStatements: []
     logto_api_resource:
         subCategory: ""
         name: logto_api_resource
@@ -100,6 +107,27 @@ resources:
                 application_id: logto_application.grafana.id
         argumentDocs: {}
         importStatements: []
+    logto_connector Resource:
+        subCategory: ""
+        description: A Logto connector; configuration is sensitive and becomes a Kubernetes Secret reference in Upjet.
+        name: logto_connector Resource
+        title: logto_connector Resource
+        argumentDocs: {}
+        importStatements: []
+    logto_id_token_config Resource:
+        subCategory: ""
+        description: ID-token extended claims, including existing role claims.
+        name: logto_id_token_config Resource
+        title: logto_id_token_config Resource
+        argumentDocs: {}
+        importStatements: []
+    logto_oidc_session_config Resource:
+        subCategory: ""
+        description: OIDC session lifetime.
+        name: logto_oidc_session_config Resource
+        title: logto_oidc_session_config Resource
+        argumentDocs: {}
+        importStatements: []
     logto_role:
         subCategory: ""
         name: logto_role
@@ -143,6 +171,13 @@ resources:
             name: (String) The name of the role. It should be unique within the tenant.
             scope_ids: (List of String) API resource scopes assigned to the role. An empty list revokes all scopes; omission leaves them unmanaged. Changes preserve the role ID and memberships.
             type: (String) The type of the role. It cannot be changed after creation.
+        importStatements: []
+    logto_sign_in_experience Resource:
+        subCategory: ""
+        description: Tenant login, branding, sign-up, password and MFA settings.
+        name: logto_sign_in_experience Resource
+        title: logto_sign_in_experience Resource
+        argumentDocs: {}
         importStatements: []
     logto_user:
         subCategory: ""

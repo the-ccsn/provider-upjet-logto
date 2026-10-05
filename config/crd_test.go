@@ -18,8 +18,8 @@ func TestGeneratedCRDsValidate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(files) != 17 {
-		t.Fatalf("expected 17 CRDs, got %d", len(files))
+	if len(files) != 27 {
+		t.Fatalf("expected 27 CRDs, got %d", len(files))
 	}
 	for _, file := range files {
 		t.Run(filepath.Base(file), func(t *testing.T) {

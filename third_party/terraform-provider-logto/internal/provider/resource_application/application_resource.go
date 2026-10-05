@@ -2,6 +2,9 @@ package resource_application
 
 import (
 	"context"
+	"encoding/json"
+	"github.com/hashicorp/terraform-plugin-framework/path"
+	"reflect"
 
 	"github.com/Lenstra/terraform-provider-logto/client"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
@@ -19,13 +22,18 @@ func (r *applicationResource) Create(ctx context.Context, req resource.CreateReq
 		return
 	}
 
-	application := decodePlan(ctx, plan)
+	application, metadataDiags := decodePlan(ctx, plan)
+	resp.Diagnostics.Append(metadataDiags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 	application, err := r.client.ApplicationCreate(ctx, application)
 	if err != nil {
 		resp.Diagnostics.AddError("Error creating application", err.Error())
 		return
 	}
 
+	state = plan
 	diags = convertToTerraformModel(ctx, application, &state)
 	// Retain the created ID even if credential retrieval fails on a later request.
 	resp.Diagnostics.Append(diags...)
@@ -97,7 +105,11 @@ func (r *applicationResource) Update(ctx context.Context, req resource.UpdateReq
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	application := decodePlan(ctx, plan)
+	application, metadataDiags := decodePlan(ctx, plan)
+	resp.Diagnostics.Append(metadataDiags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 
 	application, err := r.client.ApplicationUpdate(ctx, application)
 	if err != nil {
@@ -105,6 +117,7 @@ func (r *applicationResource) Update(ctx context.Context, req resource.UpdateReq
 		return
 	}
 
+	state = plan
 	diags = convertToTerraformModel(ctx, application, &state)
 	if !diags.HasError() {
 		resp.Diagnostics.Append(r.readSecrets(ctx, application, &state)...)
@@ -134,7 +147,8 @@ func (r *applicationResource) Delete(ctx context.Context, req resource.DeleteReq
 	}
 }
 
-func decodePlan(ctx context.Context, plan ApplicationModel) *client.ApplicationModel {
+func decodePlan(ctx context.Context, plan ApplicationModel) (*client.ApplicationModel, diag.Diagnostics) {
+	var d diag.Diagnostics
 	model := &client.ApplicationModel{
 		ID:                 plan.Id.ValueString(),
 		Name:               plan.Name.ValueString(),
@@ -151,19 +165,37 @@ func decodePlan(ctx context.Context, plan ApplicationModel) *client.ApplicationM
 		plan.CorsAllowedOrigins.ElementsAs(ctx, &model.CustomClientMetadata.CorsAllowedOrigins, true)
 	}
 
-	return model
+	if !plan.OidcClientMetadataExtra.IsNull() && !plan.OidcClientMetadataExtra.IsUnknown() {
+		var err error
+		model.OidcClientMetadataExtra, err = client.ValidateApplicationMetadata("oidcClientMetadata", plan.OidcClientMetadataExtra.ValueString())
+		if err != nil {
+			d.AddError("Invalid OIDC metadata", err.Error())
+		}
+	}
+	if !plan.CustomClientMetadataExtra.IsNull() && !plan.CustomClientMetadataExtra.IsUnknown() {
+		var err error
+		model.CustomClientMetadataExtra, err = client.ValidateApplicationMetadata("customClientMetadata", plan.CustomClientMetadataExtra.ValueString())
+		if err != nil {
+			d.AddError("Invalid custom metadata", err.Error())
+		}
+	}
+	return model, d
 }
 
 func convertToTerraformModel(ctx context.Context, app *client.ApplicationModel, model *ApplicationModel) (diags diag.Diagnostics) {
+	oidcExtra := metadataJSONState(model.OidcClientMetadataExtra, app.OidcClientMetadataExtra)
+	customExtra := metadataJSONState(model.CustomClientMetadataExtra, app.CustomClientMetadataExtra)
 	*model = ApplicationModel{
-		ClientSecrets: types.MapNull(types.StringType),
-		Id:            types.StringValue(app.ID),
-		TenantId:      types.StringValue(app.TenantId),
-		Name:          types.StringValue(app.Name),
-		Description:   types.StringValue(app.Description),
-		Type:          types.StringValue(app.Type),
-		IsThirdParty:  types.BoolValue(app.IsThirdParty),
-		IsAdmin:       types.BoolValue(app.IsAdmin),
+		OidcClientMetadataExtra:   oidcExtra,
+		CustomClientMetadataExtra: customExtra,
+		ClientSecrets:             types.MapNull(types.StringType),
+		Id:                        types.StringValue(app.ID),
+		TenantId:                  types.StringValue(app.TenantId),
+		Name:                      types.StringValue(app.Name),
+		Description:               types.StringValue(app.Description),
+		Type:                      types.StringValue(app.Type),
+		IsThirdParty:              types.BoolValue(app.IsThirdParty),
+		IsAdmin:                   types.BoolValue(app.IsAdmin),
 	}
 
 	if app.OidcClientMetadata != nil {
@@ -213,4 +245,38 @@ func (r *applicationResource) readSecrets(ctx context.Context, app *client.Appli
 	var d diag.Diagnostics
 	model.ClientSecrets, d = types.MapValueFrom(ctx, types.StringType, values)
 	return d
+}
+
+func metadataJSONState(prior types.String, actual map[string]any) types.String {
+	if actual == nil {
+		actual = map[string]any{}
+	}
+	var desired map[string]any
+	if !prior.IsNull() && !prior.IsUnknown() && json.Unmarshal([]byte(prior.ValueString()), &desired) == nil && desired != nil {
+		projected := map[string]any{}
+		for key := range desired {
+			if value, ok := actual[key]; ok {
+				projected[key] = value
+			}
+		}
+		if reflect.DeepEqual(desired, projected) {
+			return prior
+		}
+		actual = projected
+	}
+	encoded, _ := json.Marshal(actual)
+	return types.StringValue(string(encoded))
+}
+
+func (r *applicationResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	for attribute, kind := range map[string]string{"oidc_client_metadata_extra": "oidcClientMetadata", "custom_client_metadata_extra": "customClientMetadata"} {
+		var value types.String
+		resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root(attribute), &value)...)
+		if value.IsNull() || value.IsUnknown() {
+			continue
+		}
+		if _, err := client.ValidateApplicationMetadata(kind, value.ValueString()); err != nil {
+			resp.Diagnostics.AddAttributeError(path.Root(attribute), "Invalid application metadata", err.Error())
+		}
+	}
 }

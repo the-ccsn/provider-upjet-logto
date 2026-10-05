@@ -1,5 +1,9 @@
 # Terraform provider quality review
 
+> Historical 2026-10-04 audit snapshot for the original six resources. New local
+> configuration contracts and migration validation are recorded separately in
+> the [Upjet migration validation report](https://github.com/the-ccsn/provider-upjet-logto/blob/main/docs/migration-validation.md).
+
 Reviewed and hardened locally on 2026-10-04. The original audit coverage baseline
 was 60.6% overall and 76.4% handwritten runtime; generated code is kept separate.
 
