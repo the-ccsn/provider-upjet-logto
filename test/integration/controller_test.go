@@ -42,6 +42,7 @@ func TestControllerLifecycle(t *testing.T) {
 	var mu sync.Mutex
 	var entity map[string]any
 	creates, writes := 0, 0
+	adoptionReads := 0
 	namedSecrets := []map[string]string{}
 	secretCreates := 0
 	unauthorized := false
@@ -58,6 +59,9 @@ func TestControllerLifecycle(t *testing.T) {
 			return
 		}
 		switch {
+		case r.Method == "GET" && r.URL.Path == "/api/applications/previous-id":
+			adoptionReads++
+			w.WriteHeader(404)
 		case r.Method == "POST" && r.URL.Path == "/api/applications":
 			if err := json.NewDecoder(r.Body).Decode(&entity); err != nil {
 				w.WriteHeader(400)
@@ -123,10 +127,15 @@ func TestControllerLifecycle(t *testing.T) {
 	}
 	start := func() func() { return startProvider(t, configPath, caPath, dir) }
 	stop := start()
-	app := &application.Application{ObjectMeta: metav1.ObjectMeta{Name: "managed", Namespace: "tenant"}, Spec: application.ApplicationSpec{ForProvider: application.ApplicationParameters{Name: str("desired"), Type: str("Traditional")}}}
+	app := &application.Application{ObjectMeta: metav1.ObjectMeta{Name: "managed", Namespace: "tenant", Annotations: map[string]string{"logto.crossplane.io/initial-external-name": "previous-id"}}, Spec: application.ApplicationSpec{ForProvider: application.ApplicationParameters{Name: str("desired"), Type: str("Traditional")}}}
 	app.SetProviderConfigReference(&xpv2.ProviderConfigReference{Name: "default", Kind: "ProviderConfig"})
 	app.SetWriteConnectionSecretToReference(&xpv2.LocalSecretReference{Name: "connection"})
-	if err := kube.Create(ctx, app); err != nil {
+	app.SetGroupVersionKind(application.Application_GroupVersionKind)
+	desired, err := json.Marshal(app)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := kube.Patch(ctx, app, client.RawPatch(types.ApplyPatchType, desired), client.FieldOwner("kustomize-controller")); err != nil {
 		t.Fatal(err)
 	}
 	key := types.NamespacedName{Name: app.Name, Namespace: app.Namespace}
@@ -137,6 +146,23 @@ func TestControllerLifecycle(t *testing.T) {
 		connection := &corev1.Secret{}
 		return kube.Get(ctx, types.NamespacedName{Name: "connection", Namespace: "tenant"}, connection) == nil && string(connection.Data["clientId"]) == "remote-id"
 	})
+	mu.Lock()
+	reads := adoptionReads
+	mu.Unlock()
+	if reads == 0 {
+		t.Fatal("initial external ID was not observed before fresh creation")
+	}
+	for attempt := 0; attempt < 3; attempt++ {
+		if err := kube.Patch(ctx, app, client.RawPatch(types.ApplyPatchType, desired), client.FieldOwner("kustomize-controller")); err != nil {
+			t.Fatal(err)
+		}
+		if err := kube.Get(ctx, key, app); err != nil {
+			t.Fatal(err)
+		}
+		if meta.GetExternalName(app) != "remote-id" {
+			t.Fatal("GitOps apply overwrote the generated application ID")
+		}
+	}
 	named := &application.Secret{ObjectMeta: metav1.ObjectMeta{Name: "named", Namespace: "tenant"}, Spec: application.SecretSpec{ForProvider: application.SecretParameters{Name: str("gitops"), ApplicationIDRef: &xpv2.NamespacedReference{Name: "managed"}}}}
 	named.SetProviderConfigReference(&xpv2.ProviderConfigReference{Name: "default", Kind: "ProviderConfig"})
 	named.SetWriteConnectionSecretToReference(&xpv2.LocalSecretReference{Name: "named-connection"})

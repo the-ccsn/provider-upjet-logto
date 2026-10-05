@@ -125,3 +125,15 @@ Use that digest in `Provider.spec.package`. Signature verification is an explici
 release/deployment check; publishing a signature does not by itself configure
 Crossplane to enforce signatures. Consumers need anonymous GHCR pull access or
 an appropriate image pull Secret when the package is private.
+
+## GitOps adoption hints
+
+For provider-generated IDs, Git should use the optional annotation
+`logto.crossplane.io/initial-external-name` when adopting an existing object.
+The controller copies it into `crossplane.io/external-name` only when the live
+external name is empty. If the imported object is absent and Create is allowed,
+Logto assigns a new ID and the controller maintains that ID thereafter. Keep
+`crossplane.io/external-name` out of the desired manifest in this mode, so a
+subsequent GitOps apply cannot restore a stale import ID. The initializer never
+changes a nonempty live external name. Fixed singleton IDs such as `default`
+may continue to use the standard external-name annotation.

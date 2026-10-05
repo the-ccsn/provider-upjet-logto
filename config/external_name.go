@@ -20,6 +20,7 @@ func ExternalNameConfigurations() config.ResourceOption {
 	return func(r *config.Resource) {
 		if e, ok := ExternalNameConfigs[r.Name]; ok {
 			r.ExternalName = e
+			r.InitializerFns = append(r.InitializerFns, initialExternalName)
 		}
 	}
 }
