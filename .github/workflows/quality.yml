@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+  workflow_call:
   schedule:
     - cron: '23 4 * * 1'
 permissions:
@@ -117,7 +118,7 @@ jobs:
       - name: Build and verify architecture-specific release candidate
         env:
           GOARCH: ${{ matrix.architecture }}
-          VERSION: ${{ github.sha }}
+          VERSION: ${{ github.ref_type == 'tag' && github.ref_name || github.sha }}
         run: nix develop --command make package
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:

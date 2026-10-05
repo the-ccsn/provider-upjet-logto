@@ -97,3 +97,31 @@ lifecycles/imports, pagination beyond 100 objects, metadata preservation, CRD
 references, Observe behavior, authorization failure, drift repair, restart,
 connection Secret publication and explicit empty-role revocation have local
 execution evidence. Remote GitHub CI has not been dispatched from this workspace.
+
+## OCI releases and OIDC verification
+
+Pushing a new `vMAJOR.MINOR.PATCH` tag triggers `release.yml`. The reusable
+quality workflow must pass race tests, static analysis, reproducible generation,
+real Logto acceptance, shipped-controller acceptance and package verification
+before publication. The release combines the verified amd64 and arm64 packages
+into one GHCR OCI index. Existing version tags are never overwritten.
+
+Cosign obtains an ephemeral signing identity from GitHub Actions OIDC, signs the
+index and both platform digests, and verifies each signature against the exact
+release workflow/tag identity and `https://token.actions.githubusercontent.com`.
+Rekor transparency verification remains enabled. The workflow uploads signature
+verification evidence and records the immutable package reference in its summary.
+
+Before installing, verify the recorded digest with the matching release version:
+
+```sh
+nix develop --command cosign verify \
+  --certificate-identity https://github.com/the-ccsn/provider-upjet-logto/.github/workflows/release.yml@refs/tags/v0.1.0 \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  ghcr.io/the-ccsn/provider-upjet-logto@sha256:<released-index-digest>
+```
+
+Use that digest in `Provider.spec.package`. Signature verification is an explicit
+release/deployment check; publishing a signature does not by itself configure
+Crossplane to enforce signatures. Consumers need anonymous GHCR pull access or
+an appropriate image pull Secret when the package is private.

@@ -1,0 +1,85 @@
+name: Release
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: read
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  quality:
+    uses: ./.github/workflows/quality.yml
+  publish:
+    needs: quality
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    env:
+      IMAGE: ghcr.io/the-ccsn/provider-upjet-logto
+      VERSION: ${{ github.ref_name }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: cachix/install-nix-action@b85815f71a6de0ddee80b8a80a98d43f4bcc66c7 # v31
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: provider-package-*
+          path: .work/release
+      - name: Validate version and verified package checksums
+        run: |
+          set -euo pipefail
+          [[ "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          for architecture in amd64 arm64; do
+            (cd ".work/release/provider-package-$architecture" && sha256sum --check SHA256SUMS)
+          done
+      - name: Authenticate GHCR
+        env:
+          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REGISTRY_USER: ${{ github.actor }}
+        run: printf '%s' "$REGISTRY_TOKEN" | nix develop --command crane auth login ghcr.io --username "$REGISTRY_USER" --password-stdin
+      - name: Publish multi-platform package
+        run: |
+          set -euo pipefail
+          if nix develop --command crane digest "$IMAGE:$VERSION" > /dev/null 2>&1; then
+            echo 'Release tag already exists in the registry; refusing to overwrite it' >&2
+            exit 1
+          fi
+          nix develop --command crossplane xpkg push \
+            --package-files=.work/release/provider-package-amd64/provider-upjet-logto.xpkg,.work/release/provider-package-arm64/provider-upjet-logto.xpkg \
+            --oci-annotation="org.opencontainers.image.source=https://github.com/$GITHUB_REPOSITORY" \
+            --oci-annotation="org.opencontainers.image.revision=$GITHUB_SHA" \
+            "$IMAGE:$VERSION"
+          digest=$(nix develop --command crane digest "$IMAGE:$VERSION")
+          [[ "$digest" =~ ^sha256:[a-f0-9]{64}$ ]]
+          echo "DIGEST=$digest" >> "$GITHUB_ENV"
+      - name: Sign index and architecture digests with GitHub OIDC
+        run: nix develop --command cosign sign --yes --recursive "$IMAGE@$DIGEST"
+      - name: Verify exact release workflow identity and digest signatures
+        run: |
+          set -euo pipefail
+          identity="https://github.com/$GITHUB_REPOSITORY/.github/workflows/release.yml@$GITHUB_REF"
+          issuer=https://token.actions.githubusercontent.com
+          mkdir -p .work/signatures
+          nix develop --command crane manifest "$IMAGE@$DIGEST" > .work/signatures/index.json
+          python3 - <<'PYTHON'
+          import json, os
+          from pathlib import Path
+          manifests = json.loads(Path('.work/signatures/index.json').read_text())['manifests']
+          assert {(m['platform']['os'], m['platform']['architecture']) for m in manifests} == {('linux', 'amd64'), ('linux', 'arm64')}
+          Path('.work/signatures/digests.txt').write_text(os.environ['DIGEST'] + '\n' + ''.join(m['digest'] + '\n' for m in manifests))
+          PYTHON
+          while read -r digest; do
+            nix develop --command cosign verify \
+              --certificate-identity "$identity" \
+              --certificate-oidc-issuer "$issuer" \
+              "$IMAGE@$digest" > ".work/signatures/${digest#sha256:}.json"
+          done < .work/signatures/digests.txt
+          printf 'Published and OIDC verified: %s@%s\n' "$IMAGE" "$DIGEST" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: release-signature-evidence
+          path: .work/signatures
+          if-no-files-found: error
