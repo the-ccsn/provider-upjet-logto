@@ -10,9 +10,18 @@
         paths = [ pkgs.kubernetes pkgs.etcd ];
       };
     });
-    devShells = nixpkgs.lib.genAttrs systems (system: let pkgs = nixpkgs.legacyPackages.${system}; in {
+    devShells = nixpkgs.lib.genAttrs systems (system: let
+      pkgs = nixpkgs.legacyPackages.${system};
+      go = pkgs.go.overrideAttrs (_: {
+        version = "1.26.10";
+        src = pkgs.fetchurl {
+          url = "https://go.dev/dl/go1.26.10.src.tar.gz";
+          hash = "sha256-/WPog7ovK/ypPBZGsx6+9j4rHk0rMXyXidl2po2B828=";
+        };
+      });
+    in {
       default = pkgs.mkShell {
-        packages = [ pkgs.go pkgs.gotools pkgs.opentofu pkgs.gnumake pkgs.python3 pkgs.go-tools pkgs.govulncheck pkgs.actionlint pkgs.kubernetes pkgs.etcd pkgs.crane pkgs.cosign pkgs.crossplane-cli pkgs.syft pkgs.postgresql_17 ];
+        packages = [ go pkgs.gotools pkgs.opentofu pkgs.gnumake pkgs.python3 pkgs.go-tools pkgs.govulncheck pkgs.actionlint pkgs.kubernetes pkgs.etcd pkgs.crane pkgs.cosign pkgs.crossplane-cli pkgs.syft pkgs.postgresql_17 ];
       };
     });
   };
