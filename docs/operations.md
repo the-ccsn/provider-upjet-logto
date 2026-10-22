@@ -23,7 +23,7 @@ configuration surface, such as connectors and sign-in experience.
    create their own API server and never use an existing kubeconfig.
 5. Run `make package`. It builds an embedded runtime archive without a container
    daemon, builds the XPKG with the Crossplane CLI, generates an SPDX SBOM and
-   checks the binary digest, platform, non-root user, trust store and all 27 CRDs.
+   checks the binary digest, platform, non-root user, trust store and all 29 CRDs.
    `GOARCH=arm64 make package` builds the ARM candidate; rebuild for the host
    architecture before running native controller tests.
 6. Before publishing, define the fork's registry and version, configure signing
@@ -75,6 +75,20 @@ backup access and encryption consistent with the cluster's existing policy.
 - **Partial role-scope update:** obsolete permissions are revoked first. Restore
   API access and let reconciliation add desired permissions. Role identity and
   user membership remain stable; a partial failure can temporarily reduce grants.
+- **Partial application consent update:** user profile scopes reconcile in place;
+  restore API access and allow the controller to retry. API and organization
+  consent scopes remain outside this resource's ownership. Failed creations
+  preserve their validated application identity before returning the error, so a
+  restart followed by deletion still revokes the owned grants. Explicit
+  `forProvider.userScopes: []` overrides any `initProvider.userScopes` defaults
+  and revokes all user profile scopes. When only `initProvider.userScopes` is
+  configured, observed empty or partial grants do not overwrite the initial
+  target; restoring API access allows the failed assignment to recover. Once
+  initialization converges, subsequent initialization edits and external grant
+  changes are observed without enforcement. Use `forProvider.userScopes` to
+  resume continuous grant management. Preserve the controller's
+  `logto.crossplane.io/user-consent-scopes-initialized` annotation during GitOps
+  reconciliation and upgrades. This lifecycle also works without `LateInitialize`.
 - **Controller restart:** desired state, external names and connection Secrets
   reconstruct provider state. Never depend on local Terraform state files.
 - **Secret rotation:** create a new named Secret and a separate connection Secret,

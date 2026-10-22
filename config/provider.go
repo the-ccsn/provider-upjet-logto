@@ -51,6 +51,22 @@ func providerConfig(root string) *ujconfig.Provider {
 		r.Sensitive.AdditionalConnectionDetailsFn = secretDetails
 		r.References["application_id"] = ujconfig.Reference{TerraformName: "logto_application"}
 	})
+	p.AddResourceConfigurator("logto_application_user_consent_scopes", func(r *ujconfig.Resource) {
+		r.ShortGroup = "application"
+		r.Kind = "UserConsentScopes"
+		// Grant mutations are synchronous API calls. Observe must perform a
+		// fresh read instead of returning cached status during an async write.
+		r.UseAsync = false
+		// Observed grants may be empty or partial after a failed initial write.
+		// The consent connector tracks completion without promoting these
+		// creation-only fields into continuously managed forProvider fields.
+		r.LateInitializer.ConditionalIgnoredFields = []string{"application_id", "user_scopes"}
+		// Upjet's runtime leaves this empty, selecting its compatibility merge
+		// instead of our generated merge that preserves explicit empty scopes.
+		//lint:ignore SA1019 Match the sole API version until Upjet removes this compatibility switch.
+		r.ControllerReconcileVersion = r.Version
+		r.References["application_id"] = ujconfig.Reference{TerraformName: "logto_application"}
+	})
 	for name, kind := range map[string]string{"logto_sign_in_experience": "SignInExperience", "logto_account_center": "AccountCenter", "logto_id_token_config": "IDTokenConfiguration", "logto_oidc_session_config": "OIDCSessionConfiguration"} {
 		p.AddResourceConfigurator(name, func(r *ujconfig.Resource) { r.ShortGroup = "configuration"; r.Kind = kind })
 	}

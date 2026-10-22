@@ -22,6 +22,9 @@
 // Generate crossplane-runtime methodsets (resource.Claim, etc)
 //go:generate go run -tags generate github.com/crossplane/crossplane-tools/cmd/angryjet generate-methodsets --header-file=../hack/boilerplate.go.txt ./...
 
+// Preserve creation-only parent references after angryjet generates resolvers.
+//go:generate python3 ../hack/preserve_consent_references.py
+
 package apis
 
 import (

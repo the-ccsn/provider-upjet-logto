@@ -58,7 +58,7 @@ func TestRealLogtoLifecycle(t *testing.T) {
 			t.Error(err)
 		}
 	})
-	app, err := api.ApplicationCreate(ctx, &client.ApplicationModel{Name: prefix, Type: "Traditional", OidcClientMetadata: &client.OidcClientMetadata{}, CustomClientMetadata: &client.CustomClientMetadata{}})
+	app, err := api.ApplicationCreate(ctx, &client.ApplicationModel{Name: prefix, Type: "Traditional", IsThirdParty: true, OidcClientMetadata: &client.OidcClientMetadata{}, CustomClientMetadata: &client.CustomClientMetadata{}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -101,6 +101,7 @@ func TestRealLogtoLifecycle(t *testing.T) {
 			set("access_token_ttl", 3600)
 			set("resource_id", parent.ID)
 			set("application_id", app.ID)
+			set("user_scopes", []tftypes.Value{tftypes.NewValue(tftypes.String, "profile"), tftypes.NewValue(tftypes.String, "email")})
 			for _, field := range []string{"redirect_uris", "post_logout_redirect_uris", "cors_allowed_origins", "scope_ids", "role_ids"} {
 				set(field, []tftypes.Value{})
 			}

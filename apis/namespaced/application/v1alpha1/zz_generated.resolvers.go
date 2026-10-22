@@ -10,6 +10,7 @@ import (
 	"context"
 	reference "github.com/crossplane/crossplane-runtime/v2/pkg/reference"
 	errors "github.com/pkg/errors"
+	"github.com/the-ccsn/provider-upjet-logto/internal/consentscopes"
 	client "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -53,6 +54,53 @@ func (mg *Secret) ResolveReferences(ctx context.Context, c client.Reader) error 
 	}
 	mg.Spec.InitProvider.ApplicationID = reference.ToPtrValue(rsp.ResolvedValue)
 	mg.Spec.InitProvider.ApplicationIDRef = rsp.ResolvedReference
+
+	return nil
+}
+
+// ResolveReferences of this UserConsentScopes.
+func (mg *UserConsentScopes) ResolveReferences(ctx context.Context, c client.Reader) error {
+	r := reference.NewAPINamespacedResolver(c, mg)
+
+	var rsp reference.NamespacedResolutionResponse
+	var err error
+
+	rsp, err = r.Resolve(ctx, reference.NamespacedResolutionRequest{
+		CurrentValue: reference.FromPtrValue(mg.Spec.ForProvider.ApplicationID),
+		Extract:      reference.ExternalName(),
+		Namespace:    mg.GetNamespace(),
+		Reference:    mg.Spec.ForProvider.ApplicationIDRef,
+		Selector:     mg.Spec.ForProvider.ApplicationIDSelector,
+		To: reference.To{
+			List:    &ApplicationList{},
+			Managed: &Application{},
+		},
+	})
+	if err != nil {
+		return errors.Wrap(err, "mg.Spec.ForProvider.ApplicationID")
+	}
+	mg.Spec.ForProvider.ApplicationID = reference.ToPtrValue(rsp.ResolvedValue)
+	mg.Spec.ForProvider.ApplicationIDRef = rsp.ResolvedReference
+
+	// Resolve initial parent references only while choosing a new parent.
+	if mg.Spec.ForProvider.ApplicationID == nil && !consentscopes.HasInitializedParent(mg) {
+		rsp, err = r.Resolve(ctx, reference.NamespacedResolutionRequest{
+			CurrentValue: reference.FromPtrValue(mg.Spec.InitProvider.ApplicationID),
+			Extract:      reference.ExternalName(),
+			Namespace:    mg.GetNamespace(),
+			Reference:    mg.Spec.InitProvider.ApplicationIDRef,
+			Selector:     mg.Spec.InitProvider.ApplicationIDSelector,
+			To: reference.To{
+				List:    &ApplicationList{},
+				Managed: &Application{},
+			},
+		})
+		if err != nil {
+			return errors.Wrap(err, "mg.Spec.InitProvider.ApplicationID")
+		}
+		mg.Spec.InitProvider.ApplicationID = reference.ToPtrValue(rsp.ResolvedValue)
+		mg.Spec.InitProvider.ApplicationIDRef = rsp.ResolvedReference
+	}
 
 	return nil
 }

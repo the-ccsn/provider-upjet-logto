@@ -3,6 +3,7 @@ package provider_logto
 import (
 	"context"
 	"github.com/Lenstra/terraform-provider-logto/internal/provider/resource_application_secret"
+	"github.com/Lenstra/terraform-provider-logto/internal/provider/resource_application_user_consent_scopes"
 	"github.com/Lenstra/terraform-provider-logto/internal/provider/resource_configuration"
 	"os"
 
@@ -197,6 +198,7 @@ func (p *logtoProvider) Resources(_ context.Context) []func() resource.Resource 
 	return []func() resource.Resource{
 		resource_application.ApplicationResource,
 		resource_application_secret.New,
+		resource_application_user_consent_scopes.New,
 		resource_user.UserResource,
 		resource_api_resource.ApiResourceResource,
 		resource_api_resource_scope.ApiResourceScopeResource,

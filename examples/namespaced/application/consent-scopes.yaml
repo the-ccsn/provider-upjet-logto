@@ -1,0 +1,22 @@
+apiVersion: application.logto.m.crossplane.io/v1alpha1
+kind: UserConsentScopes
+metadata:
+  name: example
+  namespace: crossplane-system
+spec:
+  managementPolicies:
+  - Observe
+  - Create
+  - Update
+  - LateInitialize
+  forProvider:
+    applicationIdRef:
+      name: example
+      policy:
+        resolve: Always
+    userScopes:
+    - profile
+    - email
+  providerConfigRef:
+    name: default
+    kind: ClusterProviderConfig

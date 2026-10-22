@@ -1,0 +1,16 @@
+apiVersion: application.logto.crossplane.io/v1alpha1
+kind: UserConsentScopes
+metadata:
+  annotations:
+    meta.upbound.io/example-id: application/v1alpha1/userconsentscopes
+  labels:
+    testing.upbound.io/example-name: cloudflare_access
+  name: cloudflare-access
+spec:
+  forProvider:
+    applicationIdSelector:
+      matchLabels:
+        testing.upbound.io/example-name: cloudflare_access
+    userScopes:
+    - profile
+    - email

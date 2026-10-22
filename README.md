@@ -14,6 +14,7 @@ Each resource has a namespaced API and a legacy cluster-scoped API, version
 | --- | --- | --- |
 | `logto_application` | `application.logto.m.crossplane.io` | `Application` |
 | `logto_application_secret` | `application.logto.m.crossplane.io` | `Secret` |
+| `logto_application_user_consent_scopes` | `application.logto.m.crossplane.io` | `UserConsentScopes` |
 | `logto_api_resource` | `api.logto.m.crossplane.io` | `Resource` |
 | `logto_api_resource_scope` | `api.logto.m.crossplane.io` | `Scope` |
 | `logto_connector` | `connector.logto.m.crossplane.io` | `Connector` |
@@ -56,8 +57,10 @@ make verify
 
 `make generate` builds the fork, extracts its schema using a local development
 override (no registry installation/init), scrapes local resource docs, and runs
-Upjet, controller-gen and angryjet. `make verify` checks the snapshot, runs offline race tests and vet in both
-modules, and builds a static controller under `.work/bin/provider`.
+Upjet, controller-gen and angryjet. Schema exports use a canonical registry address
+so Terraform and OpenTofu produce identical generated files. `make verify` checks
+the snapshot, runs offline race tests and vet in both modules, and builds a static
+controller under `.work/bin/provider`.
 Caches stay in `../.local`; override `GOMODCACHE`, `GOCACHE`, or `GOPATH` if needed.
 When the default Go proxy is unavailable, set `GOPROXY` to your preferred mirror.
 Generated CRDs are in `package/crds`; runtime image definition is in
@@ -81,18 +84,65 @@ are not implemented yet. Application `client_secrets` is read-only and never
 creates or rotates secrets. Terraform sensitive fields are still present in
 Terraform state; use an encrypted and access-controlled backend.
 
+## Third-party application consent scopes
+
+`UserConsentScopes` references an `Application` with `applicationIdRef` and
+authoritatively manages its `userScopes`, for example `[profile, email]`.
+Use one consent resource per application. Omit `openid`, which is implicit.
+The controller detects drift, revokes obsolete user scopes, and assigns missing
+scopes in place; an explicit `userScopes: []` revokes all user profile scopes.
+A missing `userScopes` value never requests revocation.
+Explicit `forProvider.userScopes` values, including `[]`, override
+`initProvider.userScopes`. Initialization grants remain retryable until they
+converge. Valid partial creations retain their external application ID even when
+a mutation fails, so restarts and deletion can recover without losing ownership.
+After convergence, changes to initialization values and external grants
+are observed without modifying grants. Use `forProvider.userScopes` for continuous
+management. The controller persists initialization completion in the
+`logto.crossplane.io/user-consent-scopes-initialized` annotation across restarts.
+A new resource becomes Ready after its initial grants converge and completion
+is persisted. Concurrent GitOps changes cause metadata writes to retry with a
+fresh resource snapshot.
+Grant mutations use the synchronous Framework connector, so initialization is
+confirmed by a fresh read after the write finishes. A parent supplied only in
+`initProvider.applicationId` is never promoted into `forProvider`, including when
+late initialization is enabled or initial grants must retry. Removing the initial
+parent configuration preserves this behavior. After initialization, that parent
+remains fixed until a missing resource is recreated.
+Recreating a missing resource uses the current initialization defaults and
+resolves their references again. Completed initial references cannot block
+ongoing observation or explicit permission changes. Adopting an existing
+application by external name also ignores its initial references before the
+initialization marker is persisted.
+Recreation preparation preserves completion until a fresh read confirms absence;
+a parent that reappears retains its previous initialization state.
+API resource and organization consent scopes are preserved. Import uses the
+application ID. Deletion revokes user profile scopes without deleting the app;
+omit `Delete` from `managementPolicies` to retain grants when removing the CR.
+Users still approve requested permissions on Logto's consent screen.
+
+See `examples/namespaced/application/consent-scopes.yaml`. This CR requires a
+provider package built from this revision or newer. Publish that package and
+update the GitOps provider digest before reconciling manifests using the new
+kind; the previously released v0.1.0 package does not include this controller.
+
 ## Validation and remaining scope
 
-Offline tests cover all eleven resource lifecycles and Framework protocol v6
+Offline tests cover all twelve resource lifecycles and Framework protocol v6
 create/plan/update/read/delete, partial creation, pagination, bounded retries and cancellation,
 token reuse/refresh/concurrency, sensitive schemas, idempotent deletion,
-metadata preservation, credentials isolation, and status redaction. All 27
+metadata preservation, credentials isolation, and status redaction. All 29
 CRDs pass the Kubernetes API server structural/CEL validation functions.
 Real acceptance tests use the `integration` build tag and temporary loopback-only
 `LOGTO_TEST_CREDENTIALS`. `make test-integration` starts an isolated API Server
-and executes the shipped controller. It validates the six-resource reference
+and executes the shipped controller. It validates the seven-resource reference
 graph, drift repair, restart recovery, Observe adoption, connection Secrets,
 legacy cluster APIs and explicit empty role/scope revocation against Logto 1.40.1.
+Consent scope acceptance includes Terraform protocol CRUD/import, preservation
+of API consent grants, recovery when an initial write configured through
+`initProvider` fails, and explicit empty-list revocation with initialization
+defaults still present. These tests run through the existing
+`make test-integration` release gate.
 `KUBEBUILDER_ASSETS` must point to local etcd, kube-apiserver and kubectl binaries.
 
 Connector configuration uses a SecretRef, and its sensitive JSON stays out of
@@ -132,7 +182,7 @@ GOARCH=arm64 nix develop --command make package
 
 Each build creates `.work/provider-upjet-logto.xpkg`, `runtime.spdx.json` and
 `SHA256SUMS`. Packaging embeds the compiled controller, checks the non-root
-runtime, CA certificates and all 27 CRDs, and inventories dependencies with
+runtime, CA certificates and all 29 CRDs, and inventories dependencies with
 Syft. The local package builder does not need a container daemon.
 
 ## License and provenance

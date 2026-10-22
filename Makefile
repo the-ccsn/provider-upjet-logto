@@ -52,6 +52,7 @@ schema:
 	printf '%s\n' 'terraform {' ' required_providers {' '  logto = { source = "Lenstra/logto" }' ' }' '}' > $(WORK_DIR)/schema/main.tf
 	printf '%s\n' 'provider_installation {' ' dev_overrides { "Lenstra/logto" = "$(WORK_DIR)/bin" }' ' direct {}' '}' > $(WORK_DIR)/schema/terraform.rc
 	TF_CLI_CONFIG_FILE=$(WORK_DIR)/schema/terraform.rc $(TF) -chdir=$(WORK_DIR)/schema providers schema -json > config/schema.json.tmp
+	python3 hack/normalize_schema.py config/schema.json.tmp
 	mv config/schema.json.tmp config/schema.json
 
 generate: schema

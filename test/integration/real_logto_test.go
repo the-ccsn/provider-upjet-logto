@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -78,7 +79,13 @@ func TestRealControllerGraph(t *testing.T) {
 	stop := startProvider(t, configPath, caPath, dir)
 	prefix := "graph_" + time.Now().Format("150405")
 	objectMeta := func(name string) metav1.ObjectMeta { return metav1.ObjectMeta{Name: name, Namespace: "tenant"} }
-	app := &application.Application{ObjectMeta: objectMeta("application"), Spec: application.ApplicationSpec{ForProvider: application.ApplicationParameters{Name: str(prefix), Type: str("Traditional")}}}
+	thirdParty := true
+	resolveAlways := xpv2.ResolvePolicyAlways
+	app := &application.Application{ObjectMeta: objectMeta("application"), Spec: application.ApplicationSpec{ForProvider: application.ApplicationParameters{Name: str(prefix), Type: str("Traditional"), IsThirdParty: &thirdParty}}}
+	consent := &application.UserConsentScopes{ObjectMeta: objectMeta("consent"), Spec: application.UserConsentScopesSpec{
+		ForProvider:  application.UserConsentScopesParameters{ApplicationIDRef: &xpv2.NamespacedReference{Name: "application", Policy: &xpv2.Policy{Resolve: &resolveAlways}}},
+		InitProvider: application.UserConsentScopesInitParameters{UserScopes: []*string{str("profile"), str("email")}},
+	}}
 	named := &application.Secret{ObjectMeta: objectMeta("named"), Spec: application.SecretSpec{ForProvider: application.SecretParameters{Name: str(prefix), ApplicationIDRef: &xpv2.NamespacedReference{Name: "application"}}}}
 	resource := &api.Resource{ObjectMeta: objectMeta("resource"), Spec: api.ResourceSpec{ForProvider: api.ResourceParameters{Name: str(prefix), Indicator: str("https://" + prefix + ".example.invalid")}}}
 	scope := &api.Scope{ObjectMeta: objectMeta("scope"), Spec: api.ScopeSpec{ForProvider: api.ScopeParameters{Name: str("read"), ResourceIDRef: &xpv2.NamespacedReference{Name: "resource"}}}}
@@ -88,7 +95,7 @@ func TestRealControllerGraph(t *testing.T) {
 		client.Object
 		SetProviderConfigReference(*xpv2.ProviderConfigReference)
 		GetCondition(xpv2.ConditionType) xpv2.Condition
-	}{app, named, resource, scope, grant, account}
+	}{app, named, resource, scope, grant, account, consent}
 	ids := map[string]string{}
 	t.Cleanup(func() {
 		stop()
@@ -133,6 +140,25 @@ func TestRealControllerGraph(t *testing.T) {
 		})
 		ids[object.GetName()] = meta.GetExternalName(object)
 	}
+	consentMatches := func(want ...string) bool {
+		actual, err := remote.ApplicationUserConsentScopesGet(ctx, ids["application"])
+		if err != nil || actual == nil {
+			return false
+		}
+		slices.Sort(actual)
+		slices.Sort(want)
+		return slices.Equal(actual, want)
+	}
+	eventually(t, "real application consent grants", func() bool { return consentMatches("profile", "email") })
+	// Initialization grants apply once. Explicit forProvider values opt into
+	// continuous drift correction for the rest of this acceptance graph.
+	if err := kube.Patch(ctx, consent, client.RawPatch(types.MergePatchType, []byte(`{"spec":{"forProvider":{"userScopes":["profile","email"]}}}`))); err != nil {
+		t.Fatal(err)
+	}
+	if err := remote.ApplicationUserConsentScopesUpdate(ctx, ids["application"], []string{"phone", "email"}); err != nil {
+		t.Fatal(err)
+	}
+	eventually(t, "real consent drift correction", func() bool { return consentMatches("profile", "email") })
 	connection := &corev1.Secret{}
 	eventually(t, "real named secret connection", func() bool {
 		return kube.Get(ctx, types.NamespacedName{Name: "named-connection", Namespace: "tenant"}, connection) == nil && len(connection.Data["clientSecret"]) > 0
@@ -198,7 +224,11 @@ func TestRealControllerGraph(t *testing.T) {
 		return err == nil && current.Name == prefix
 	})
 	stop()
+	if err := remote.ApplicationUserConsentScopesUpdate(ctx, ids["application"], []string{"phone"}); err != nil {
+		t.Fatal(err)
+	}
 	stop = startProvider(t, configPath, caPath, dir)
+	eventually(t, "real consent restart recovery", func() bool { return consentMatches("profile", "email") })
 	for _, object := range managed {
 		eventually(t, "restart identity: "+object.GetName(), func() bool {
 			return kube.Get(ctx, client.ObjectKeyFromObject(object), object) == nil && meta.GetExternalName(object) == ids[object.GetName()] && object.GetCondition(xpv2.TypeSynced).Status == corev1.ConditionTrue
@@ -219,6 +249,22 @@ func TestRealControllerGraph(t *testing.T) {
 		scopes, err := remote.RoleScopesGet(ctx, ids["role"])
 		return err == nil && len(scopes) == 0
 	})
+	// A previously initialized scope set must not override explicit revocation.
+	if err := kube.Patch(ctx, consent, client.RawPatch(types.MergePatchType, []byte(`{"spec":{"forProvider":{"userScopes":[]}}}`))); err != nil {
+		t.Fatal(err)
+	}
+	eventually(t, "real consent empty overrides initProvider", func() bool { return consentMatches() })
+	if err := kube.Patch(ctx, consent, client.RawPatch(types.MergePatchType, []byte(`{"spec":{"forProvider":{"userScopes":["email"]}}}`))); err != nil {
+		t.Fatal(err)
+	}
+	eventually(t, "real consent update after revocation", func() bool { return consentMatches("email") })
+	if err := kube.Delete(ctx, consent); err != nil {
+		t.Fatal(err)
+	}
+	eventually(t, "real consent deletion revokes user scopes", func() bool { return consentMatches() })
+	if parent, err := remote.ApplicationGet(ctx, ids["application"]); err != nil || parent == nil {
+		t.Fatalf("consent deletion removed parent: %v", err)
+	}
 	// Adopt an existing user using only its ID and role relation, as the GitOps
 	// migration does. Transfer write ownership before adding the second object.
 	if err := kube.Patch(ctx, account, client.RawPatch(types.MergePatchType, []byte(`{"spec":{"managementPolicies":["Observe"]}}`))); err != nil {

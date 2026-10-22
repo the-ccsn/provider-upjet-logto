@@ -17,6 +17,7 @@ func TestExplicitEmptyCollectionsSurviveSerialization(t *testing.T) {
 	}{
 		{"user", user.UserParameters{RoleIds: []*string{}}, user.UserParameters{}, "roleIds"},
 		{"role", role.RoleParameters{ScopeIds: []*string{}}, role.RoleParameters{}, "scopeIds"},
+		{"consent-scopes", application.UserConsentScopesParameters{UserScopes: []*string{}}, application.UserConsentScopesParameters{}, "userScopes"},
 		{"application", application.ApplicationParameters{RedirectUris: []*string{}}, application.ApplicationParameters{}, "redirectUris"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

@@ -11,3 +11,6 @@ func (tr *Application) Hub() {}
 
 // Hub marks this type as a conversion hub.
 func (tr *Secret) Hub() {}
+
+// Hub marks this type as a conversion hub.
+func (tr *UserConsentScopes) Hub() {}

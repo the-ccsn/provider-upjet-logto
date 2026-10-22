@@ -13,6 +13,7 @@ import (
 	scope "github.com/the-ccsn/provider-upjet-logto/internal/controller/namespaced/api/scope"
 	application "github.com/the-ccsn/provider-upjet-logto/internal/controller/namespaced/application/application"
 	secret "github.com/the-ccsn/provider-upjet-logto/internal/controller/namespaced/application/secret"
+	userconsentscopes "github.com/the-ccsn/provider-upjet-logto/internal/controller/namespaced/application/userconsentscopes"
 	accountcenter "github.com/the-ccsn/provider-upjet-logto/internal/controller/namespaced/configuration/accountcenter"
 	idtokenconfiguration "github.com/the-ccsn/provider-upjet-logto/internal/controller/namespaced/configuration/idtokenconfiguration"
 	oidcsessionconfiguration "github.com/the-ccsn/provider-upjet-logto/internal/controller/namespaced/configuration/oidcsessionconfiguration"
@@ -31,6 +32,7 @@ func Setup(mgr ctrl.Manager, o controller.Options) error {
 		scope.Setup,
 		application.Setup,
 		secret.Setup,
+		userconsentscopes.Setup,
 		accountcenter.Setup,
 		idtokenconfiguration.Setup,
 		oidcsessionconfiguration.Setup,
@@ -55,6 +57,7 @@ func SetupGated(mgr ctrl.Manager, o controller.Options) error {
 		scope.SetupGated,
 		application.SetupGated,
 		secret.SetupGated,
+		userconsentscopes.SetupGated,
 		accountcenter.SetupGated,
 		idtokenconfiguration.SetupGated,
 		oidcsessionconfiguration.SetupGated,
@@ -78,6 +81,7 @@ func SetupWebhookWithManager(mgr ctrl.Manager) error {
 		scope.SetupWebhookWithManager,
 		application.SetupWebhookWithManager,
 		secret.SetupWebhookWithManager,
+		userconsentscopes.SetupWebhookWithManager,
 		accountcenter.SetupWebhookWithManager,
 		idtokenconfiguration.SetupWebhookWithManager,
 		oidcsessionconfiguration.SetupWebhookWithManager,

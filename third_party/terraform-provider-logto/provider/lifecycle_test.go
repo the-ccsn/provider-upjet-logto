@@ -235,6 +235,10 @@ func TestResourceLifecycle(t *testing.T) {
 		r := factory()
 		var meta resource.MetadataResponse
 		r.Metadata(ctx, resource.MetadataRequest{ProviderTypeName: "logto"}, &meta)
+		// Relation ownership is exercised by TestUserConsentScopesLifecycle.
+		if meta.TypeName == "logto_application_user_consent_scopes" {
+			continue
+		}
 		if _, ok := client.ConfigurationContract(strings.TrimPrefix(meta.TypeName, "logto_")); ok {
 			continue
 		}

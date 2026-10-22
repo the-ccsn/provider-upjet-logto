@@ -9,9 +9,21 @@ import (
 	application "github.com/the-ccsn/provider-upjet-logto/apis/namespaced/application/v1alpha1"
 )
 
+func TestProviderSchemaUsesCanonicalRegistry(t *testing.T) {
+	var schema struct {
+		Providers map[string]json.RawMessage `json:"provider_schemas"`
+	}
+	if err := json.Unmarshal([]byte(providerSchema), &schema); err != nil {
+		t.Fatal(err)
+	}
+	if len(schema.Providers) != 1 || schema.Providers["registry.terraform.io/lenstra/logto"] == nil {
+		t.Fatal("generated schema must use the canonical Terraform registry address")
+	}
+}
+
 func TestSecretConnectionDetails(t *testing.T) {
 	cfg := GetProviderNamespaced()
-	if len(cfg.Resources) != 11 {
+	if len(cfg.Resources) != 12 {
 		t.Fatalf("got %d resources", len(cfg.Resources))
 	}
 	tr := &application.Secret{}

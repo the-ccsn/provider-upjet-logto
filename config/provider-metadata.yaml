@@ -107,6 +107,28 @@ resources:
                 application_id: logto_application.grafana.id
         argumentDocs: {}
         importStatements: []
+    logto_application_user_consent_scopes:
+        subCategory: ""
+        description: Manage the allowed user profile consent scopes of a third-party application.
+        name: logto_application_user_consent_scopes
+        title: logto_application_user_consent_scopes Resource - logto
+        examples:
+            - name: cloudflare_access
+              manifest: |-
+                {
+                  "application_id": "${logto_application.cloudflare_access.id}",
+                  "user_scopes": [
+                    "profile",
+                    "email"
+                  ]
+                }
+              references:
+                application_id: logto_application.cloudflare_access.id
+        argumentDocs:
+            application_id: (String) Application ID. Changing it requires replacement.
+            id: (String) The application ID.
+            user_scopes: (Set of String) Allowed user profile scopes. An empty set revokes all user profile scopes.
+        importStatements: []
     logto_connector Resource:
         subCategory: ""
         description: A Logto connector; configuration is sensitive and becomes a Kubernetes Secret reference in Upjet.
